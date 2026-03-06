@@ -86,12 +86,23 @@ function parseJson(txt) {
 
 // ── Handler principal ────────────────────────────────────────────────────────
 
-// ── RECHERCHE PRIX VIA GOOGLE CUSTOM SEARCH + GROQ ────────────────────────
-async function searchWinePrice({ name, year, domain, app, region }) {
-  const wineLabel = [name, year, domain].filter(Boolean).join(" ");
-  const query = `prix ${wineLabel} acheter bouteille`;
+// ── RECHERCHE PRIX VIA GOOGLE → IDEALWINE (SOURCE UNIQUE) ─────────────────
+const FORMAT_LABELS = {
+  375: 'demi-bouteille 37.5cl', 750: '75cl', 1500: 'magnum 1.5L',
+  3000: 'double magnum 3L', 4500: 'jéroboam 4.5L', 6000: 'impériale 6L',
+};
+async function searchWinePrice({ name, year, domain, app, region, format }) {
+  const fmt = parseInt(format) || 750;
+  const fmtLabel = FORMAT_LABELS[fmt] || `${fmt}ml`;
+  const is75cl = fmt === 750;
 
-  let snippets = "";
+  // Requête ciblée iDealwine avec format si non standard
+  const wineLabel = [name, year, domain].filter(Boolean).join(' ');
+  const query = is75cl
+    ? `"${name}"${year ? ' ' + year : ''} site:idealwine.com prix`
+    : `"${name}"${year ? ' ' + year : ''} ${fmtLabel} site:idealwine.com prix`;
+
+  let snippets = '';
   const apiKey = process.env.GOOGLE_API_KEY;
   const cx     = process.env.GOOGLE_CX;
 
@@ -101,14 +112,15 @@ async function searchWinePrice({ name, year, domain, app, region }) {
       const gr = await fetch(url);
       const gData = await gr.json();
       snippets = (gData.items || [])
-        .map(r => `${r.title} — ${r.snippet || ""} [${r.link}]`)
-        .join("\n");
-    } catch(e) { snippets = ""; }
+        .map(r => `${r.title} — ${r.snippet || ''} [${r.link}]`)
+        .join('\n');
+    } catch(e) { snippets = ''; }
   }
 
+  const fmtContext = is75cl ? 'bouteille 75cl' : `format ${fmtLabel}`;
   const prompt = snippets
-    ? `Voici des résultats Google pour le vin "${wineLabel}" :\n${snippets}\n\nExtrait le prix actuel de vente en bouteille 75cl (en euros). Réponds JSON UNIQUEMENT, sans markdown :\n{"currentPrice":85,"priceRange":"70-100€","priceSource":"iDealwine","trend":"hausse|stable|baisse","priceNote":"bref contexte"}`
-    : `Estime le prix marché 2025 du vin "${wineLabel}" selon son appellation et millésime. Réponds JSON UNIQUEMENT, sans markdown :\n{"currentPrice":85,"priceRange":"70-100€","priceSource":"estimation","trend":"stable","priceNote":"estimation sans données web"}`;
+    ? `Voici des résultats iDealwine pour le vin "${wineLabel}" en ${fmtContext} :\n${snippets}\n\nExtrait le prix de vente actuel pour CE format (${fmtContext}). Réponds JSON UNIQUEMENT, sans markdown :\n{"currentPrice":85,"priceRange":"70-100€","priceSource":"iDealwine","trend":"hausse|stable|baisse","priceNote":"bref contexte"}`
+    : `Estime le prix 2025 du vin "${wineLabel}" en ${fmtContext} selon son appellation et millésime. Réponds JSON UNIQUEMENT, sans markdown :\n{"currentPrice":85,"priceRange":"70-100€","priceSource":"estimation","trend":"stable","priceNote":"estimation sans données web"}`;
 
   const txt = await groqText(prompt);
   return parseJson(txt);
@@ -183,8 +195,8 @@ Réponds JSON UNIQUEMENT, sans markdown :
 
     // ── 3. Recherche de prix ──────────────────────────────────────────────
     } else if (body.type === "price") {
-      const { name, year, domain, app, region } = body;
-      result = await searchWinePrice({ name, year, domain, app, region });
+      const { name, year, domain, app, region, format } = body;
+      result = await searchWinePrice({ name, year, domain, app, region, format });
 
     } else {
       res.writeHead(400, corsHeaders());
