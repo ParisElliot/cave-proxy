@@ -407,7 +407,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font-
 </div>
 
 <!-- DETAIL SHEET -->
-<div class="sheet" id="detailSheet"><div class="sh-hd"></div><div id="detailContent"></div></div>
+<div class="sheet" id="detailSheet">
+  <div class="sh-hd"></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px 0">
+    <button onclick="closeAll()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--go);font-family:'Montserrat',sans-serif;font-size:13px;font-weight:500;cursor:pointer;padding:4px 0">‹ Retour</button>
+  </div>
+  <div id="detailContent"></div>
+</div>
 
 <!-- CAVE CONFIG SHEET -->
 <div class="sheet" id="caveSheet">
@@ -485,6 +491,22 @@ function save(){
   localStorage.setItem('cv3_cave',  JSON.stringify(cave));
 }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2) }
+function groupKey(w){ return [w.name||'',w.domain||'',w.year||'',w.type||''].join('|') }
+function groupWines(list){
+  const map=new Map();
+  list.forEach(w=>{
+    const k=groupKey(w);
+    if(!map.has(k)){
+      map.set(k,{...w,_ids:[w.id],_slots:[w.slot],_qty:+w.qty||1});
+    } else {
+      const g=map.get(k);
+      g._ids.push(w.id);
+      if(w.slot) g._slots.push(w.slot);
+      g._qty+=(+w.qty||1);
+    }
+  });
+  return [...map.values()];
+}
 function emo(t){ return {red:'🍷',white:'🥂',rose:'🌸',champagne:'✨',orange:'🍊',sweet:'🍯',fortified:'🥃',other:'🍶'}[t]||'🍾' }
 function typeLbl(t){ return {red:'Rouge',white:'Blanc',rose:'Rosé',champagne:'Effervescent',orange:'Orange',sweet:'Doux',fortified:'Fortifié',other:'Autre'}[t]||t }
 function fmtLbl(f){ return {375:'Demi 37,5cl',750:'75cl',1500:'Magnum 1,5L',3000:'Jéroboam 3L',4500:'Réhoboam 4,5L',6000:'Mathusalem 6L',9000:'Salmanazar 9L',12000:'Balthazar 12L'}[+f]||f+'ml' }
@@ -594,7 +616,7 @@ function renderWines(){
       if(cw.decant) r+=` · Carafer ${cw.decant} min`;
       if(cw.temp)   r+=` · ${cw.temp}°C`;
       if(cw.food)   r+=` · ${cw.food.split(/[,;]/)[0].trim()}…`;
-      conseil=`<div class="conseil" onclick="openDetail('${cw.id}')">
+      conseil=`<div class="conseil" onclick="openDetailGroup('${cw.id}')">
         <span class="cmore" onclick="event.stopPropagation();advIdx++;renderWines()">🔀</span>
         <div class="ctag">💡 Conseil du jour · ${Y}</div>
         <div class="cname">${cw.name}${cw.year?' '+cw.year:''}</div>
@@ -602,7 +624,9 @@ function renderWines(){
       </div>`;
     }
   }
-  s.innerHTML=stats+conseil+`<div class="sh"><h2>${list.length} bouteille${list.length>1?'s':''}</h2></div>`+list.map(wCard).join('');
+  const grouped=groupWines(list);
+  const totBt=list.reduce((a,w)=>a+(+w.qty||1),0);
+  s.innerHTML=stats+conseil+`<div class="sh"><h2>${totBt} bouteille${totBt>1?'s':''}</h2></div>`+grouped.map(wCard).join('');
 }
 
 function slotShort(w){
@@ -626,12 +650,13 @@ function wCard(w){
     evo=w.currentPrice>w.price?`<span style="color:var(--grL);font-size:10px">▲${pct}%</span>`:`<span style="color:#e88;font-size:10px">▼${Math.abs(pct)}%</span>`;
   }
   const fBadge=w.format&&+w.format!==750?`<span class="b by">${fmtLbl(w.format)}</span>`:'';
-  return `<div class="wc ${w.type}" onclick="openDetail('${w.id}')">
+  const groupId=w._ids?w._ids.join(','):w.id;
+  return `<div class="wc ${w.type}" onclick="openDetailGroup('${groupId}')">
     <div class="wthumb">${thumb}</div>
     <div class="wi">
       <div class="wname">${w.name||'Vin sans nom'}</div>
       <div class="wdom">${w.domain||''}${w.region?' · '+w.region:''}${w.country&&w.country!=='France'?' 🌍':''}</div>
-      <div class="wmeta">${w.year?`<span class="b by">${w.year}</span>`:''}${fBadge}${w.qty>1?`<span class="b bq">×${w.qty}</span>`:''}${w.score?`<span class="b bsc">★${w.score}</span>`:''}${statusBadge(w)}</div>
+      <div class="wmeta">${w.year?`<span class="b by">${w.year}</span>`:''}${fBadge}${(w._qty||w.qty)>1?`<span class="b bq">×${w._qty||w.qty}</span>`:''}${w.score?`<span class="b bsc">★${w.score}</span>`:''}${statusBadge(w)}</div>
     </div>
     <div class="wrt">
       <div style="text-align:right">${w.gift?'🎁':w.price?`<div class="wprice">${(+w.price).toFixed(0)}€</div>`:''}${evo}</div>
@@ -665,7 +690,7 @@ function renderPlan(){
         const isPk=ws==='peak',isSn=isSoon(w)&&ws!=='peak',yr=w.year?String(w.year).slice(2):'',nm=(w.name||'').split(' ')[0].substring(0,6);
         slots+=`<div class="cslot occupied ${w.type}${isPk?' peaked':''}${isSn?' soon-ring':''}"
           draggable="true" ondragstart="dragStart(event,'${key}')" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropSlot(event,'${key}')"
-          onclick="openDetail('${w.id}')" title="${w.name||''} ${w.year||''}">
+          onclick="openDetailGroup('${w.id}')" title="${w.name||''} ${w.year||''}">
           <div class="cslot-dot" style="background:${typeColor(w.type)}"></div>
           <div class="cslot-yr">${yr}</div>
           <div class="cslot-nm">${nm}</div>
@@ -1071,6 +1096,87 @@ async function saveWine(){
 
 // ── DETAIL ────────────────────────────────────────
 function openDetail(id){const w=wines.find(x=>x.id===id);if(!w)return;renderDetail(w);showSheet('detailSheet')}
+function openDetailGroup(idStr){
+  const ids=idStr.split(',');
+  const ws=ids.map(id=>wines.find(x=>x.id===id)).filter(Boolean);
+  if(!ws.length)return;
+  renderDetailGroup(ws);showSheet('detailSheet');
+}
+
+function renderDetailGroup(ws){
+  const w=ws[0]; // référence pour les infos communes
+  const totalQty=ws.reduce((a,x)=>a+(+x.qty||1),0);
+  const allSlots=ws.map(x=>slotFull(x)).filter(s=>s&&s!=='Non défini');
+  const slotsHtml=allSlots.length
+    ? allSlots.map((s,i)=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bd);font-size:12px"><span style="color:var(--cd)">Bouteille ${i+1}</span><span style="color:var(--cr)">${s}</span></div>`).join('')
+    : '<p style="color:var(--td)">Aucun emplacement défini</p>';
+  const food=w.food?w.food.split(/[,;]+/).filter(Boolean).map(f=>`<span class="pchip">${f.trim()}</span>`).join(''):'';
+  const pBuy=w.gift?`<div class="ib"><div class="ibl">Provenance</div><div class="ibv grn">🎁 ${w.gift}</div></div>`:
+    w.price?`<div class="ib"><div class="ibl">Prix d'achat</div><div class="ibv g">${(+w.price).toFixed(2)} €</div></div>`:'';
+  let pEvo='';
+  if(w.currentPrice&&w.price){const pct=(((w.currentPrice-w.price)/w.price)*100).toFixed(1),up=w.currentPrice>=w.price;pEvo=`<div style="font-size:11px;color:${up?'var(--grL)':'#e88'};margin-top:2px">${up?'📈 +':'📉 '}${pct}% vs achat</div>`}
+  const tIco={hausse:'📈',stable:'➡️',baisse:'📉'}[w.priceTrend]||'';
+  const priceBlock=`<div class="price-box"><div class="price-hdr">
+    <div>
+      <div style="font-size:9px;color:var(--td);letter-spacing:1px;text-transform:uppercase;margin-bottom:3px">💰 Prix du marché</div>
+      <div id="pval_${w.id}" class="price-val">${w.currentPrice?`~${w.currentPrice} €`:`<span style="font-size:14px;color:var(--td)">—</span>`}</div>
+      <div id="pmeta_${w.id}" class="price-meta">${w.currentPrice?`${w.priceSrc||''} ${tIco}${pEvo}`:''} ${w.priceUpdated?`<br>Mis à jour ${w.priceUpdated}`:''}</div>
+    </div>
+    <button class="rbtn" id="rbtn_${w.id}" onclick="refreshPrice('${w.id}')">🔄 Actualiser</button>
+  </div></div>`;
+  const s=status(w),a=adjYears(w);
+  const mat=s==='peak'?`<div class="gadv peak">⭐ À point — apogée ${a.pF}–${a.pT||'?'}</div>`:
+    s==='ready'?`<div class="gadv ok">✅ Prêt à boire</div>`:
+    s==='wait'?`<div class="gadv wait">🌱 Trop jeune${a.pF?` — apogée vers ${a.pF}`:''}</div>`:
+    s==='over'?`<div class="gadv over">📉 Sur le déclin — à consommer rapidement</div>`:'';
+  const ids=ws.map(x=>x.id);
+  document.getElementById('detailContent').innerHTML=`
+    ${w.photo?`<img class="dp" src="${w.photo}" alt="${w.name}">`:`<div class="dph">${emo(w.type)}</div>`}
+    <div class="sb">
+      <div class="dname">${w.name||'Vin sans nom'}</div>
+      <div class="dsub">${w.domain||''}${w.region?' · '+w.region:''}${w.app?' · '+w.app:''}${w.country&&w.country!=='France'?' · 🌍 '+w.country:''}</div>
+      <div class="dbdgs">
+        ${w.year?`<span class="b by">🍇 ${w.year}</span>`:''}
+        <span class="b by">${emo(w.type)} ${typeLbl(w.type)}</span>
+        ${w.format&&+w.format!==750?`<span class="b by">📦 ${fmtLbl(w.format)}</span>`:''}
+        ${w.grape?`<span class="b by" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w.grape}</span>`:''}
+        <span class="b bq">×${totalQty} bouteille${totalQty>1?'s':''}</span>
+        ${w.score?`<span class="b bsc">★ ${w.score}/20</span>`:''}
+        ${statusBadge(w)}
+      </div>
+      ${mat}${gardeBar(w)}${priceBlock}
+      <div class="igrid">
+        ${w.decant?`<div class="ib"><div class="ibl">⏱ Carafage</div><div class="ibv">${w.decant} min</div></div>`:''}
+        ${w.temp?`<div class="ib"><div class="ibl">🌡 Service</div><div class="ibv">${w.temp}°C</div></div>`:''}
+        ${pBuy}
+        <div class="ib"><div class="ibl">📅 Entrée cave</div><div class="ibv" style="font-size:12px">${w.addedDate||'?'}</div></div>
+      </div>
+      <div class="nb"><div class="nbt">📍 Emplacements (${totalQty} bouteille${totalQty>1?'s':''})</div>${slotsHtml}</div>
+      ${food?`<div class="nb"><div class="nbt">🍽 Accords</div><div class="pchips">${food}</div></div>`:''}
+      ${w.notes?`<div class="nb"><div class="nbt">🍷 Dégustation</div><p>${w.notes}</p></div>`:''}
+      ${w.perso?`<div class="nb"><div class="nbt">📝 Notes</div><p>${w.perso}</p></div>`:''}
+      <div class="dacts">
+        ${totalQty>1
+          ? `<button class="btn-drink" onclick="drinkOneWine('${ids[0]}','${ids.join(',')}')">🍷 Marquer 1 bouteille comme bue</button>`
+          : `<button class="btn-drink" onclick="drinkWine('${ids[0]}')">🍷 Marquer comme bue</button>`
+        }
+        <button class="bsm bedit" onclick="editWine('${w.id}')">✏️</button>
+        <button class="bsm bdel" id="bdel_${w.id}" onclick="delWine('${w.id}')">🗑</button>
+      </div>
+      <div style="height:20px"></div>
+    </div>`;
+}
+
+function renderDetail(w){ renderDetailGroup([w]); }
+
+function drinkOneWine(firstId, allIdsStr){
+  const btn=document.querySelector('.btn-drink');if(!btn)return;
+  const ids=allIdsStr.split(',');
+  btn.outerHTML=`<div style="flex:1;display:flex;gap:8px">
+    <button onclick="confirmDrink('${firstId}')" style="flex:1;background:linear-gradient(135deg,var(--grL),var(--gr));color:#fff;padding:13px;border-radius:var(--r);border:none;font-family:'Montserrat',sans-serif;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer">✅ 1 bouteille bue</button>
+    <button onclick="openDetailGroup('${allIdsStr}')" style="flex:1;background:var(--s2);color:var(--td);padding:13px;border-radius:var(--r);border:1px solid var(--bd);font-family:'Montserrat',sans-serif;font-size:11px;font-weight:600;cursor:pointer">Annuler</button>
+  </div>`;
+}
 
 function renderDetail(w){
   const food=w.food?w.food.split(/[,;]+/).filter(Boolean).map(f=>`<span class="pchip">${f.trim()}</span>`).join(''):'';
