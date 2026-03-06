@@ -45,7 +45,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font-
 .cname{font-family:'Cormorant Garamond',serif;font-size:19px;color:var(--cr);margin-bottom:4px}
 .creason{font-size:11px;color:var(--cd);line-height:1.6}
 .cmore{position:absolute;top:12px;right:12px;font-size:17px;cursor:pointer;color:var(--go);opacity:.7}
-.wc{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px;margin-bottom:10px;display:flex;gap:12px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.swipe-wrap{position:relative;margin-bottom:10px;overflow:hidden;border-radius:var(--r)}
+.swipe-del{position:absolute;right:0;top:0;bottom:0;width:80px;background:#c0392b;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:3px;cursor:pointer;border-radius:0 var(--r) var(--r) 0;flex-shrink:0}
+.swipe-del span{font-size:18px}
+.swipe-del small{font-size:9px;color:rgba(255,255,255,.8);letter-spacing:1px;text-transform:uppercase;font-weight:600}
+.swipe-inner{transform:translateX(0);transition:transform .25s cubic-bezier(.4,0,.2,1);will-change:transform}
+.swipe-inner.swiped{transform:translateX(-80px)}
+.wc{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px;display:flex;gap:12px;cursor:pointer;transition:background .2s;position:relative;overflow:hidden}
 .wc:active{transform:scale(.98)}
 .wc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:3px 0 0 3px}
 .wc.red::before{background:var(--wi)}.wc.white::before{background:var(--go)}.wc.rose::before{background:#d4728a}
@@ -656,19 +662,100 @@ function wCard(w){
   }
   const fBadge=w.format&&+w.format!==750?`<span class="b by">${fmtLbl(w.format)}</span>`:'';
   const groupId=w._ids?w._ids.join(','):w.id;
-  return `<div class="wc ${w.type}" onclick="openDetailGroup('${groupId}')">
-    <div class="wthumb">${thumb}</div>
-    <div class="wi">
-      <div class="wname">${w.name||'Vin sans nom'}</div>
-      <div class="wdom">${w.domain||''}${w.region?' · '+w.region:''}${w.country&&w.country!=='France'?' 🌍':''}</div>
-      <div class="wmeta">${w.year?`<span class="b by">${w.year}</span>`:''}${fBadge}${(w._qty||w.qty)>1?`<span class="b bq">×${w._qty||w.qty}</span>`:''}${(w.score!=null&&w.score!=='')?`<span class="b bsc">★${w.score}</span>`:''}${statusBadge(w)}</div>
+  const swipeId='sw_'+w.id;
+  return `<div class="swipe-wrap" id="${swipeId}">
+    <div class="swipe-del" onclick="swipeDelete('${groupId}','${swipeId}')">
+      <span>🗑</span><small>Suppr.</small>
     </div>
-    <div class="wrt">
-      <div style="text-align:right">${w.gift?'🎁':w.price?`<div class="wprice">${(+w.price).toFixed(0)}€</div>`:''}${evo}</div>
-      <div class="wloc">${slotShort(w)}</div>
+    <div class="swipe-inner" id="si_${w.id}"
+      ontouchstart="swipeStart(event,'${w.id}')"
+      ontouchmove="swipeMove(event,'${w.id}')"
+      ontouchend="swipeEnd(event,'${w.id}','${groupId}','${swipeId}')">
+      <div class="wc ${w.type}" onclick="swipeTap('${w.id}','${groupId}')">
+        <div class="wthumb">${thumb}</div>
+        <div class="wi">
+          <div class="wname">${w.name||'Vin sans nom'}</div>
+          <div class="wdom">${w.domain||''}${w.region?' · '+w.region:''}${w.country&&w.country!=='France'?' 🌍':''}</div>
+          <div class="wmeta">${w.year?`<span class="b by">${w.year}</span>`:''}${fBadge}${(w._qty||w.qty)>1?`<span class="b bq">×${w._qty||w.qty}</span>`:''}${(w.score!=null&&w.score!=='')?`<span class="b bsc">★${w.score}</span>`:''}${statusBadge(w)}</div>
+        </div>
+        <div class="wrt">
+          <div style="text-align:right">${w.gift?'🎁':w.price?`<div class="wprice">${(+w.price).toFixed(0)}€</div>`:''}${evo}</div>
+          <div class="wloc">${slotShort(w)}</div>
+        </div>
+      </div>
     </div>
   </div>`;
 }
+
+// ── SWIPE TO DELETE ───────────────────────────────
+let _swTx={},_swX0={},_swSwiped={};
+
+function swipeStart(e,id){
+  const t=e.touches[0];
+  _swX0[id]=t.clientX;
+  _swTx[id]=_swSwiped[id]?-80:0;
+}
+function swipeMove(e,id){
+  const dx=e.touches[0].clientX-_swX0[id];
+  const tx=Math.min(0,Math.max(-80,(_swTx[id]||0)+dx));
+  const el=document.getElementById('si_'+id);
+  if(el){el.style.transition='none';el.style.transform=`translateX(${tx}px)`;}
+  // Empêcher le scroll vertical si swipe horizontal marqué
+  if(Math.abs(dx)>8) e.preventDefault();
+}
+function swipeEnd(e,id,groupId,swipeId){
+  const dx=e.changedTouches[0].clientX-_swX0[id];
+  const el=document.getElementById('si_'+id);
+  if(!el)return;
+  el.style.transition='';
+  if(dx<-30){
+    // Swipe gauche → ouvrir
+    el.style.transform='translateX(-80px)';
+    _swSwiped[id]=true;
+    // Fermer les autres
+    document.querySelectorAll('.swipe-inner.swiped').forEach(o=>{if(o.id!=='si_'+id){o.classList.remove('swiped');o.style.transform=''}});
+    el.classList.add('swiped');
+  } else if(dx>10){
+    // Swipe droite → fermer
+    el.style.transform='';
+    el.classList.remove('swiped');
+    _swSwiped[id]=false;
+  }
+}
+function swipeTap(id,groupId){
+  // Si swipé, refermer au lieu d'ouvrir la fiche
+  if(_swSwiped[id]){
+    const el=document.getElementById('si_'+id);
+    if(el){el.style.transform='';el.classList.remove('swiped');}
+    _swSwiped[id]=false;
+    return;
+  }
+  openDetailGroup(groupId);
+}
+function swipeDelete(groupId,swipeId){
+  const ids=groupId.split(',');
+  // Animation de sortie
+  const wrap=document.getElementById(swipeId);
+  if(wrap){
+    wrap.style.transition='all .3s ease';
+    wrap.style.opacity='0';
+    wrap.style.height=wrap.offsetHeight+'px';
+    setTimeout(()=>{wrap.style.height='0';wrap.style.marginBottom='0';wrap.style.overflow='hidden';},50);
+    setTimeout(()=>{
+      // Supprimer tous les vins du groupe
+      wines=wines.filter(w=>!ids.includes(w.id));
+      save();showToast('🗑 Supprimé');
+      renderWines();
+    },320);
+  }
+}
+// Fermer tous les swipes ouverts si on scroll
+document.addEventListener('scroll',()=>{
+  document.querySelectorAll('.swipe-inner.swiped').forEach(el=>{
+    el.classList.remove('swiped');el.style.transform='';
+  });
+  Object.keys(_swSwiped).forEach(k=>_swSwiped[k]=false);
+},true);
 
 // ── PLAN DE CAVE ──────────────────────────────────
 function renderPlan(){
