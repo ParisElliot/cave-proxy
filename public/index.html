@@ -278,7 +278,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font-
   <div class="hdr">
     <div class="hdr-top">
       <div>
-        <div class="htitle">Ma <span>Cave</span></div>
+        <div class="htitle">Cave à vin <span>d'Elliot</span></div>
         <div class="hsub" id="hdrSub">…</div>
       </div>
       <div class="hacts">
@@ -640,8 +640,9 @@ function switchTab(t){
 function renderCave(){ updateHdr(); renderWines(); checkNotif(); }
 function updateHdr(){
   const tot=wines.reduce((a,w)=>a+(+w.qty||1),0);
-  const val=wines.reduce((a,w)=>a+(+w.price||0)*(+w.qty||1),0);
-  document.getElementById('hdrSub').textContent=`${tot} bouteille${tot>1?'s':''} · ${val.toFixed(0)} €`;
+  const cur=wines.reduce((a,w)=>a+(+w.currentPrice||+w.price||0)*(+w.qty||1),0);
+  const hasCur=wines.some(w=>w.currentPrice);
+  document.getElementById('hdrSub').textContent=`${tot} bouteille${tot>1?'s':''} · ${cur>0?cur.toFixed(0)+'€'+(hasCur?' marché':' achat'):'—'}`;
 }
 function setFilter(f,el){
   filter=f;
