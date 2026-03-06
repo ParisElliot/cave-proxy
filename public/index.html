@@ -676,7 +676,7 @@ function wCard(w){
         <div class="wi">
           <div class="wname">${w.name||'Vin sans nom'}</div>
           <div class="wdom">${w.domain||''}${w.region?' · '+w.region:''}${w.country&&w.country!=='France'?' 🌍':''}</div>
-          <div class="wmeta">${w.year?`<span class="b by">${w.year}</span>`:''}${fBadge}${(w._qty||w.qty)>1?`<span class="b bq">×${w._qty||w.qty}</span>`:''}${(w.score!=null&&w.score!=='')?`<span class="b bsc">★${w.score}</span>`:''}${statusBadge(w)}</div>
+          <div class="wmeta">${w.year?`<span class="b by">${w.year}</span>`:''}${fBadge}${(w._qty||w.qty)>1?`<span class="b bq">×${w._qty||w.qty}</span>`:''}${statusBadge(w)}${(w.score!=null&&w.score!==''&&w.score!==0)?`<span class="b bsc">★ ${w.score}/20</span>`:''}${w.currentPrice?`<span style="font-size:10px;color:var(--go)">~${w.currentPrice}€</span>`:''}</div>
         </div>
         <div class="wrt">
           <div style="text-align:right">${w.gift?'🎁':w.price?`<div class="wprice">${(+w.price).toFixed(0)}€</div>`:''}${evo}</div>
@@ -974,6 +974,7 @@ function applyEnrichedToForm(info){
   sv('f_kT',info.kT);sv('f_pF',info.pF);sv('f_pT',info.pT);
   svf('f_dec',info.decant);svf('f_temp',info.temp);
   svf('f_food',info.food);svf('f_notes',info.notes);
+  svf('f_score',info.score);
 }
 
 function wizGoStep(n){
@@ -1150,7 +1151,7 @@ async function saveWine(){
     region:g('f_region')||'',app:g('f_app')||'',country:g('f_country')||'France',format:ni(g('f_format'))||750,
     grape:g('f_grape')||'',qty:ni(g('f_qty'))||1,price:n(g('f_price')),gift:g('f_gift')||'',
     kF:ni(g('f_kF')),kT:ni(g('f_kT')),pF:ni(g('f_pF')),pT:ni(g('f_pT')),decant:ni(g('f_dec')),temp:ni(g('f_temp')),
-    food:g('f_food')||'',score:(g('f_score')!==''?parseFloat(g('f_score'))||null:null),notes:g('f_notes')||'',perso:g('f_perso')||'',
+    food:g('f_food')||'',score:(g('f_score')!==''?parseFloat(g('f_score'))||null:(enrichedData.score!=null?enrichedData.score:null)),notes:g('f_notes')||'',perso:g('f_perso')||'',
     slot:selSlots[0]||selSlot||null,photo:photoUrl,
     currentPrice:window._aip||enrichedData.currentPrice||null,
     priceSrc:window._aisrc||enrichedData.priceSource||null,
