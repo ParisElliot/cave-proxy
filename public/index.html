@@ -1178,59 +1178,6 @@ function drinkOneWine(firstId, allIdsStr){
   </div>`;
 }
 
-function renderDetail(w){
-  const food=w.food?w.food.split(/[,;]+/).filter(Boolean).map(f=>`<span class="pchip">${f.trim()}</span>`).join(''):'';
-  const pBuy=w.gift?`<div class="ib"><div class="ibl">Provenance</div><div class="ibv grn">🎁 ${w.gift}</div></div>`:
-    w.price?`<div class="ib"><div class="ibl">Prix d'achat</div><div class="ibv g">${(+w.price).toFixed(2)} €</div></div>`:'';
-  let pEvo='';
-  if(w.currentPrice&&w.price){const pct=(((w.currentPrice-w.price)/w.price)*100).toFixed(1),up=w.currentPrice>=w.price;pEvo=`<div style="font-size:11px;color:${up?'var(--grL)':'#e88'};margin-top:2px">${up?'📈 +':'📉 '}${pct}% vs achat</div>`}
-  const tIco={hausse:'📈',stable:'➡️',baisse:'📉'}[w.priceTrend]||'';
-  const priceBlock=`<div class="price-box"><div class="price-hdr">
-    <div>
-      <div style="font-size:9px;color:var(--td);letter-spacing:1px;text-transform:uppercase;margin-bottom:3px">💰 Prix du marché</div>
-      <div id="pval_${w.id}" class="price-val">${w.currentPrice?`~${w.currentPrice} €`:`<span style="font-size:14px;color:var(--td)">—</span>`}</div>
-      <div id="pmeta_${w.id}" class="price-meta">${w.currentPrice?`${w.priceSrc||''} ${tIco}${pEvo}`:''} ${w.priceUpdated?`<br>Mis à jour ${w.priceUpdated}`:''}</div>
-    </div>
-    <button class="rbtn" id="rbtn_${w.id}" onclick="refreshPrice('${w.id}')">🔄 Actualiser</button>
-  </div></div>`;
-  const s=status(w),a=adjYears(w);
-  const mat=s==='peak'?`<div class="gadv peak">⭐ À point — apogée ${a.pF}–${a.pT||'?'}</div>`:
-    s==='ready'?`<div class="gadv ok">✅ Prêt à boire</div>`:
-    s==='wait'?`<div class="gadv wait">🌱 Trop jeune${a.pF?` — apogée vers ${a.pF}`:''}</div>`:
-    s==='over'?`<div class="gadv over">📉 Sur le déclin — à consommer rapidement</div>`:'';
-  document.getElementById('detailContent').innerHTML=`
-    ${w.photo?`<img class="dp" src="${w.photo}" alt="${w.name}">`:`<div class="dph">${emo(w.type)}</div>`}
-    <div class="sb">
-      <div class="dname">${w.name||'Vin sans nom'}</div>
-      <div class="dsub">${w.domain||''}${w.region?' · '+w.region:''}${w.app?' · '+w.app:''}${w.country&&w.country!=='France'?' · 🌍 '+w.country:''}</div>
-      <div class="dbdgs">
-        ${w.year?`<span class="b by">🍇 ${w.year}</span>`:''}
-        <span class="b by">${emo(w.type)} ${typeLbl(w.type)}</span>
-        ${w.format&&+w.format!==750?`<span class="b by">📦 ${fmtLbl(w.format)}</span>`:''}
-        ${w.grape?`<span class="b by" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w.grape}</span>`:''}
-        ${w.qty>1?`<span class="b bq">×${w.qty}</span>`:''}
-        ${w.score?`<span class="b bsc">★ ${w.score}/20</span>`:''}
-        ${statusBadge(w)}
-      </div>
-      ${mat}${gardeBar(w)}${priceBlock}
-      <div class="igrid">
-        ${w.decant?`<div class="ib"><div class="ibl">⏱ Carafage</div><div class="ibv">${w.decant} min</div></div>`:''}
-        ${w.temp?`<div class="ib"><div class="ibl">🌡 Service</div><div class="ibv">${w.temp}°C</div></div>`:''}
-        ${pBuy}
-        <div class="ib"><div class="ibl">📅 Entrée cave</div><div class="ibv" style="font-size:12px">${w.addedDate||'?'}</div></div>
-      </div>
-      <div class="nb"><div class="nbt">📍 Emplacement</div><p>${slotFull(w)}</p></div>
-      ${food?`<div class="nb"><div class="nbt">🍽 Accords</div><div class="pchips">${food}</div></div>`:''}
-      ${w.notes?`<div class="nb"><div class="nbt">🍷 Dégustation</div><p>${w.notes}</p></div>`:''}
-      ${w.perso?`<div class="nb"><div class="nbt">📝 Notes</div><p>${w.perso}</p></div>`:''}
-      <div class="dacts">
-        <button class="btn-drink" onclick="drinkWine('${w.id}')">🍷 Marquer comme bue</button>
-        <button class="bsm bedit" onclick="editWine('${w.id}')">✏️</button>
-        <button class="bsm bdel" id="bdel_${w.id}" onclick="delWine('${w.id}')">🗑</button>
-      </div>
-      <div style="height:20px"></div>
-    </div>`;
-}
 
 // ── PRIX ──────────────────────────────────────────
 async function refreshPrice(id){
