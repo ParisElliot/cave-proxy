@@ -984,8 +984,7 @@ function buildWizRecap(){
   const el=document.getElementById('wizRecap');
   el.innerHTML=`<div style="font-size:9px;color:var(--go);letter-spacing:1.5px;text-transform:uppercase;font-weight:600;margin-bottom:5px">${emo(type)} ${typeLbl(type)}${year?' · '+year:''}</div>
     <div style="font-family:'Cormorant Garamond',serif;font-size:20px;color:var(--cr)">${name}</div>
-    ${price?`<div style="font-size:12px;color:var(--td);margin-top:3px">Achat : ${price} €${cur?` · Marché estimé : <span style="color:var(--go)">~${cur} €</span>`:''}</div>`:''}
-    ${cur&&!price?`<div style="font-size:12px;color:var(--go);margin-top:3px">Prix marché estimé : ~${cur} €</div>`:''}`;
+    ${price?`<div style="font-size:12px;color:var(--td);margin-top:3px">Prix d'achat : ${price} €</div>`:''}`;
 }
 
 function openAddWine(){
@@ -1046,13 +1045,12 @@ async function enrichWineByName(name,year){
     enrichedData=info;
     // Remplir les champs silencieusement (sans écraser ce que l'utilisateur a saisi)
     enrichedData=info;
-    window._aip=info.currentPrice;window._aisrc=info.priceSource;window._aitrend=info.priceTrend;
     // Remplir les champs déjà visibles (page 1 + page 2 si ouverte)
     applyEnrichedToForm(info);
     if(div){
       div.innerHTML=`<div style="background:rgba(74,124,89,.1);border:1px solid rgba(74,124,89,.3);border-radius:var(--rs);padding:11px;margin-bottom:4px">
         <div style="font-size:10px;color:var(--grL);letter-spacing:1px;font-weight:600;margin-bottom:3px">✅ Vin enrichi automatiquement</div>
-        <div style="font-size:12px;color:var(--cd);line-height:1.7">${info.region||''}${info.app?' · '+info.app:''}${info.grape?'<br>'+info.grape:''}${info.currentPrice?`<br><span style="color:var(--go)">💰 Prix marché estimé : ~${info.currentPrice} € (${info.priceSource||'web'})</span>`:''}</div>
+        <div style="font-size:12px;color:var(--cd);line-height:1.7">${info.region||''}${info.app?' · '+info.app:''}${info.grape?'<br>'+info.grape:''}<br><span style="color:var(--td);font-size:11px">💰 Prix marché : recherche après création…</span></div>
       </div>`
     }
   }catch(e){
@@ -1099,11 +1097,10 @@ async function analyzeLabel(url){
     div.innerHTML=`<div style="background:rgba(74,124,89,.1);border:1px solid rgba(74,124,89,.3);border-radius:var(--rs);padding:11px;margin-bottom:14px">
       <div style="font-size:10px;color:var(--grL);letter-spacing:1px;font-weight:600;margin-bottom:3px">✅ VIN IDENTIFIÉ</div>
       <div style="font-family:'Cormorant Garamond',serif;font-size:17px;color:var(--cr)">${info.name||'Vin identifié'}</div>
-      ${info.currentPrice?`<div style="font-size:11px;color:var(--go);margin-top:3px">~${info.currentPrice}€ · ${info.priceSource||'marché'}</div>`:''}
+      <div style="font-size:11px;color:var(--td);margin-top:3px">💰 Prix marché : recherche après création…</div>
     </div>`;
     // Stocker dans enrichedData pour remplir page 2 quand elle s'affiche
     enrichedData=info;
-    window._aip=info.currentPrice;window._aisrc=info.priceSource;window._aitrend=info.priceTrend;
     // Remplir les champs page 1 (toujours présents)
     const sv=(id,v)=>{if(v!=null){const e=document.getElementById(id);if(e)e.value=v}};
     sv('f_name',info.name);sv('f_year',info.year);
@@ -1127,10 +1124,10 @@ async function saveWine(){
     kF:ni(g('f_kF')),kT:ni(g('f_kT')),pF:ni(g('f_pF')),pT:ni(g('f_pT')),decant:ni(g('f_dec')),temp:ni(g('f_temp')),
     food:g('f_food')||'',score:(g('f_score')!==''?parseFloat(g('f_score'))||null:(enrichedData.score!=null?enrichedData.score:null)),notes:g('f_notes')||'',perso:g('f_perso')||'',
     slot:selSlots[0]||selSlot||null,photo:photoUrl,
-    currentPrice:window._aip||enrichedData.currentPrice||null,
-    priceSrc:window._aisrc||enrichedData.priceSource||null,
-    priceTrend:window._aitrend||enrichedData.priceTrend||null,
-    priceUpdated:(window._aip||enrichedData.currentPrice)?new Date().toLocaleDateString('fr-FR'):null,
+    currentPrice:null,
+    priceSrc:null,
+    priceTrend:null,
+    priceUpdated:null,
     addedDate:editId?wines.find(w=>w.id===editId)?.addedDate:new Date().toLocaleDateString('fr-FR')};
   if(editId){
     const i=wines.findIndex(w=>w.id===editId);if(i>=0)wines[i]=wine;
@@ -1151,11 +1148,11 @@ async function saveWine(){
   save();closeAll();
   const isNew=!editId;
   showToast(editId?'✅ Vin modifié':'🍾 Bouteille ajoutée !');
-  window._aip=null;window._aisrc=null;window._aitrend=null;selSlot=null;selSlots=[];enrichedData={};
+  selSlot=null;selSlots=[];enrichedData={};
   setTimeout(()=>switchTab(tab),300);
   // Si nouveau vin sans prix marché et clé API dispo → chercher le prix en arrière-plan
-  if(isNew&&!wine.currentPrice&&getProxyUrl()){
-    await new Promise(r=>setTimeout(r,800));
+  if(isNew&&getProxyUrl()){
+    await new Promise(r=>setTimeout(r,900));
     showToast('🔍 Recherche du prix marché…',3000);
     await refreshPrice(wine.id);
   }
