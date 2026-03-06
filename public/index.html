@@ -28,6 +28,28 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font-
 .srch input:focus{border-color:var(--gd)}
 .srch input::placeholder{color:var(--td)}
 .srch .si{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--td);font-size:15px;pointer-events:none}
+.srch-row{display:flex;gap:8px;align-items:center;margin:10px 20px 0}
+.srch-row .srch{margin:0;flex:1}
+.sort-btn{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:9px 12px;color:var(--td);font-size:13px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.sort-btn.on{border-color:var(--go);color:var(--go)}
+.notif-banner{margin:10px 20px 0;background:linear-gradient(135deg,var(--wi),#7a1530);border-radius:var(--r);padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px}
+.notif-banner .nb-ico{font-size:22px;flex-shrink:0}
+.notif-banner .nb-txt{flex:1}
+.notif-banner .nb-ttl{font-size:12px;font-weight:700;color:#fff;letter-spacing:.5px}
+.notif-banner .nb-sub{font-size:11px;color:rgba(255,255,255,.75);margin-top:2px}
+.notif-banner .nb-cls{color:rgba(255,255,255,.6);font-size:16px;padding:4px}
+.stat-bar{height:6px;background:var(--s3);border-radius:3px;margin-top:6px;overflow:hidden}
+.stat-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--wi),var(--go))}
+.stat-donut{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.stat-pill{padding:5px 10px;border-radius:20px;border:1px solid var(--bd);font-size:11px;color:var(--cd);background:var(--sf)}
+.stat-pill span{color:var(--go);font-weight:700}
+.top-wine{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--bd)}
+.top-wine:last-child{border-bottom:none}
+.top-wine .tw-rank{font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--td);width:24px;text-align:center}
+.top-wine .tw-info{flex:1}
+.top-wine .tw-name{font-size:13px;color:var(--cr);font-weight:600}
+.top-wine .tw-sub{font-size:11px;color:var(--td);margin-top:2px}
+.top-wine .tw-score{font-size:14px;color:var(--go);font-weight:700}
 .filters{display:flex;gap:8px;padding:10px 20px 0;overflow-x:auto;scrollbar-width:none;flex-shrink:0}
 .filters::-webkit-scrollbar{display:none}
 .chip{padding:5px 13px;border-radius:20px;border:1px solid var(--bd);background:var(--sf);font-size:11px;font-weight:500;white-space:nowrap;cursor:pointer;color:var(--td);transition:all .2s}
@@ -264,10 +286,21 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font-
         <div class="ibtn" id="globalRefBtn" onclick="refreshAllPrices()">🔄</div>
       </div>
     </div>
-    <div class="srch" id="srchWrap" style="display:none">
+    <div id="notifBanner" style="display:none" class="notif-banner" onclick="goToApogee()">
+      <div class="nb-ico">⭐</div>
+      <div class="nb-txt">
+        <div class="nb-ttl" id="notifTitle">Vins à apogée</div>
+        <div class="nb-sub" id="notifSub">Appuyez pour voir</div>
+      </div>
+      <div class="nb-cls" onclick="event.stopPropagation();dismissNotif()">✕</div>
+    </div>
+  </div>
+  <div class="srch-row" id="srchWrap" style="display:none">
+    <div class="srch">
       <span class="si">🔍</span>
       <input type="text" id="srchIn" placeholder="Rechercher…" oninput="renderWines()">
     </div>
+    <button class="sort-btn" id="sortBtn" onclick="cycleSortMode()">⇅</button>
   </div>
   <div class="filters" id="filtersRow" style="display:none">
     <div class="chip on" onclick="setFilter('all',this)">Tous</div>
@@ -278,6 +311,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font-
     <div class="chip" onclick="setFilter('white',this)">🥂 Blancs</div>
     <div class="chip" onclick="setFilter('rose',this)">🌸 Rosés</div>
     <div class="chip" onclick="setFilter('champagne',this)">✨ Effervescents</div>
+    <div class="chip" onclick="setFilter('bordeaux',this)">🏰 Bordeaux</div>
+    <div class="chip" onclick="setFilter('bourgogne',this)">🍇 Bourgogne</div>
+    <div class="chip" onclick="setFilter('rhone',this)">🌊 Rhône</div>
+    <div class="chip" onclick="setFilter('champagne_reg',this)">🥂 Champagne</div>
     <div class="chip" onclick="setFilter('over',this)">⚠️ Déclin</div>
   </div>
 
@@ -466,7 +503,47 @@ async function callProxy(payload){
 }
 // cave = { name:string, etages:[ {label:string, cols:number} ] }
 
-let editId=null, selSlot=null, selSlots=[], photoUrl=null, tab='cave', filter='all', advIdx=0;
+let editId=null, selSlot=null, selSlots=[], photoUrl=null, tab='cave', filter='all', advIdx=0, sortMode='default', notifDismissed=false;
+const SORT_MODES=[
+  {key:'default', lbl:'⇅',  fn:()=>0},
+  {key:'apogee',  lbl:'⭐', fn:(a,b)=>(a.pF||9999)-(b.pF||9999)},
+  {key:'score',   lbl:'★',  fn:(a,b)=>(b.score||0)-(a.score||0)},
+  {key:'price',   lbl:'💰', fn:(a,b)=>(b.currentPrice||b.price||0)-(a.currentPrice||a.price||0)},
+  {key:'recent',  lbl:'🆕', fn:(a,b)=>new Date((b.addedDate||'').split('/').reverse().join('-')||0)-new Date((a.addedDate||'').split('/').reverse().join('-')||0)},
+];
+function cycleSortMode(){
+  const idx=SORT_MODES.findIndex(m=>m.key===sortMode);
+  sortMode=SORT_MODES[(idx+1)%SORT_MODES.length].key;
+  const btn=document.getElementById('sortBtn');
+  if(btn){const m=SORT_MODES.find(x=>x.key===sortMode);btn.textContent=m.lbl;btn.classList.toggle('on',sortMode!=='default');}
+  renderWines();
+}
+function checkNotif(){
+  if(notifDismissed) return;
+  const peak=wines.filter(w=>status(w)==='peak');
+  const soon=wines.filter(isSoon);
+  const banner=document.getElementById('notifBanner');
+  if(!banner) return;
+  if(peak.length){
+    document.getElementById('notifTitle').textContent=`${peak.length} vin${peak.length>1?'s':''} à l'apogée !`;
+    document.getElementById('notifSub').textContent=peak.slice(0,2).map(w=>w.name).join(', ')+(peak.length>2?' …':'');
+    banner.style.display='flex';
+  } else if(soon.length){
+    document.getElementById('notifTitle').textContent=`${soon.length} vin${soon.length>1?'s':''} à boire bientôt`;
+    document.getElementById('notifSub').textContent=soon.slice(0,2).map(w=>w.name).join(', ')+(soon.length>2?' …':'');
+    banner.style.display='flex';
+  } else {
+    banner.style.display='none';
+  }
+}
+function dismissNotif(){notifDismissed=true;document.getElementById('notifBanner').style.display='none';}
+function goToApogee(){
+  const peak=wines.filter(w=>status(w)==='peak');
+  const targetFilter=peak.length?'peak':'soon';
+  const chipIdx=peak.length?3:2;
+  const chip=document.querySelectorAll('.chip')[chipIdx-1];
+  setFilter(targetFilter,chip);
+}
 let dragSrc=null;
 const Y=new Date().getFullYear();
 
@@ -560,7 +637,7 @@ function switchTab(t){
   else if(t==='plan'){sw.style.display='none';fr.style.display='none';fab.style.display='';renderPlan()}
   else{sw.style.display='none';fr.style.display='none';fab.style.display='none';renderArchive()}
 }
-function renderCave(){ updateHdr(); renderWines() }
+function renderCave(){ updateHdr(); renderWines(); checkNotif(); }
 function updateHdr(){
   const tot=wines.reduce((a,w)=>a+(+w.qty||1),0);
   const val=wines.reduce((a,w)=>a+(+w.price||0)*(+w.qty||1),0);
@@ -585,7 +662,13 @@ function renderWines(){
   else if(filter==='peak') list=list.filter(w=>status(w)==='peak');
   else if(filter==='soon') list=list.filter(isSoon);
   else if(filter==='over') list=list.filter(w=>status(w)==='over');
-  if(q) list=list.filter(w=>['name','domain','region','app'].some(k=>(w[k]||'').toLowerCase().includes(q))||String(w.year||'').includes(q));
+  else if(filter==='bordeaux') list=list.filter(w=>(w.region||'').toLowerCase().includes('bordeaux'));
+  else if(filter==='bourgogne') list=list.filter(w=>(w.region||'').toLowerCase().includes('bourgogne'));
+  else if(filter==='rhone') list=list.filter(w=>(w.region||'').toLowerCase().includes('rhône')||(w.region||'').toLowerCase().includes('rhone'));
+  else if(filter==='champagne_reg') list=list.filter(w=>(w.region||'').toLowerCase().includes('champagne'));
+  if(q) list=list.filter(w=>['name','domain','region','app','grape'].some(k=>(w[k]||'').toLowerCase().includes(q))||String(w.year||'').includes(q));
+  // Tri
+  if(sortMode!=='default'){const sf=SORT_MODES.find(m=>m.key===sortMode);if(sf)list=[...list].sort(sf.fn);}
   const s=document.getElementById('mainScroll');
   if(!wines.length){s.innerHTML=`<div class="empty-cv"><div class="em">🍾</div><p>Cave vide</p><small>Ajoutez votre première bouteille via le bouton +</small></div>`;return}
   if(!list.length){s.innerHTML=`<div class="empty-cv"><div class="em">🔍</div><p>Aucun résultat</p></div>`;return}
@@ -1352,32 +1435,62 @@ function openStats(){
   const tot=wines.reduce((a,w)=>a+(+w.qty||1),0);
   const val=wines.reduce((a,w)=>a+(+w.price||0)*(+w.qty||1),0);
   const cur=wines.reduce((a,w)=>a+(+w.currentPrice||+w.price||0)*(+w.qty||1),0);
-  const avg=wines.filter(w=>w.score).reduce((s,w,_,ar)=>s+w.score/ar.length,0);
+  const scoredWines=wines.filter(w=>w.score);
+  const avg=scoredWines.length?scoredWines.reduce((s,w)=>s+w.score,0)/scoredWines.length:0;
   const byT={};wines.forEach(w=>{byT[w.type]=(byT[w.type]||0)+(+w.qty||1)});
+  const byR={};wines.forEach(w=>{if(w.region){const r=w.region.trim();byR[r]=(byR[r]||0)+(+w.qty||1);}});
   const types=[{t:'red',l:'Rouges',e:'🍷'},{t:'white',l:'Blancs',e:'🥂'},{t:'rose',l:'Rosés',e:'🌸'},{t:'champagne',l:'Effervescents',e:'✨'},{t:'orange',l:'Oranges',e:'🍊'},{t:'sweet',l:'Doux',e:'🍯'},{t:'fortified',l:'Fortifiés',e:'🥃'},{t:'other',l:'Autres',e:'🍶'}];
   const pv=cur-val,up=pv>=0,cap=caveCap(),used=caveUsed();
+  const drinkNow=wines.filter(w=>status(w)==='peak'||status(w)==='ready'||isSoon(w));
+  const top3=[...scoredWines].sort((a,b)=>(b.score||0)-(a.score||0)).slice(0,3);
+  const apogeeNext=[...wines.filter(w=>w.pF&&w.pF>=Y)].sort((a,b)=>(a.pF||9999)-(b.pF||9999)).slice(0,3);
+  const topRegions=Object.entries(byR).sort((a,b)=>b[1]-a[1]).slice(0,5);
   document.getElementById('detailContent').innerHTML=`
     <div class="sh-hd"></div>
-    <div class="sh-hdr"><div class="sh-ttl">Statistiques</div><button class="sh-cls" onclick="closeAll()">✕</button></div>
+    <div class="sh-hdr"><div class="sh-ttl">📊 Ma cave en chiffres</div><button class="sh-cls" onclick="closeAll()">✕</button></div>
     <div class="sb">
       <div class="stats-row">
         <div class="sc"><div class="scn">${tot}</div><div class="scl">Bouteilles</div></div>
-        <div class="sc"><div class="scn">${val.toFixed(0)}€</div><div class="scl">Valeur achat</div></div>
-        <div class="sc"><div class="scn" style="color:${up?'var(--grL)':'#e88'}">${up?'+':''}${pv.toFixed(0)}€</div><div class="scl">Plus-value</div></div>
+        <div class="sc"><div class="scn">${val>0?val.toFixed(0)+'€':'—'}</div><div class="scl">Valeur achat</div></div>
+        <div class="sc"><div class="scn" style="color:${up?'var(--grL)':'#e88'}">${cur>0?(up?'+':'')+pv.toFixed(0)+'€':'—'}</div><div class="scl">Plus-value</div></div>
       </div>
-      <div class="nb"><div class="nbt">Valeur actuelle estimée</div>
-        <div style="font-family:'Cormorant Garamond',serif;font-size:28px;color:var(--go)">${cur.toFixed(0)} €</div>
-        ${avg?`<div style="font-size:12px;color:var(--td);margin-top:6px">Note moyenne ★ ${avg.toFixed(1)}/20</div>`:''}
-      </div>
-      ${cap?`<div class="nb"><div class="nbt">Occupation de la cave</div>
-        <div style="font-family:'Cormorant Garamond',serif;font-size:24px;color:var(--go)">${used} / ${cap}</div>
-        <div style="height:6px;background:var(--s3);border-radius:3px;margin-top:8px;overflow:hidden"><div style="height:100%;background:linear-gradient(90deg,var(--wi),var(--go));width:${(used/cap*100).toFixed(0)}%;border-radius:3px"></div></div>
+      ${cur>0?`<div class="nb"><div class="nbt">💰 Valeur actuelle estimée</div>
+        <div style="font-family:'Cormorant Garamond',serif;font-size:32px;color:var(--go);margin:4px 0">${cur.toFixed(0)} €</div>
+        ${avg?`<div style="font-size:12px;color:var(--td)">Note moyenne ★ ${avg.toFixed(1)}/20</div>`:''}
+      </div>`:''}
+      ${drinkNow.length?`<div class="nb" style="border-left:3px solid var(--wi);padding-left:12px"><div class="nbt">🍷 À servir maintenant (${drinkNow.length})</div>
+        ${drinkNow.slice(0,4).map(w=>`<div style="padding:5px 0;border-bottom:1px solid var(--bd);font-size:12px;color:var(--cr)">${w.name}${w.year?' '+w.year:''}</div>`).join('')}
+        ${drinkNow.length>4?`<div style="font-size:11px;color:var(--td);margin-top:6px">et ${drinkNow.length-4} autre${drinkNow.length-4>1?'s':''}…</div>`:''}
+      </div>`:''}
+      ${top3.length?`<div class="nb"><div class="nbt">★ Meilleures bouteilles</div>
+        ${top3.map((w,i)=>`<div class="top-wine">
+          <div class="tw-rank">${['①','②','③'][i]}</div>
+          <div class="tw-info"><div class="tw-name">${w.name}</div><div class="tw-sub">${w.domain||''}${w.year?' · '+w.year:''}</div></div>
+          <div class="tw-score">★ ${w.score}/20</div>
+        </div>`).join('')}
+      </div>`:''}
+      ${apogeeNext.length?`<div class="nb"><div class="nbt">⏳ Prochaines apogées</div>
+        ${apogeeNext.map(w=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bd);font-size:12px"><span style="color:var(--cr)">${w.name}${w.year?' '+w.year:''}</span><span style="color:var(--go)">⭐ ${w.pF}–${w.pT||'?'}</span></div>`).join('')}
+      </div>`:''}
+      ${cap?`<div class="nb"><div class="nbt">🗄 Occupation</div>
+        <div style="font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--go)">${used} / ${cap} bouteilles</div>
+        <div class="stat-bar"><div class="stat-bar-fill" style="width:${Math.min(100,(used/cap*100)).toFixed(0)}%"></div></div>
         <div style="font-size:11px;color:var(--td);margin-top:4px">${cap-used} emplacement${cap-used>1?'s':''} libre${cap-used>1?'s':''}</div>
       </div>`:''}
-      <div class="nb"><div class="nbt">Répartition par type</div>
-        ${types.map(x=>byT[x.t]?`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--bd)"><span>${x.e} ${x.l}</span><span style="color:var(--go)">${byT[x.t]} bt.</span></div>`:'').join('')}
+      <div class="nb"><div class="nbt">🍾 Répartition par type</div>
+        ${types.map(x=>byT[x.t]?`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd)">
+          <span>${x.e}</span><span style="flex:1;font-size:12px;color:var(--cd)">${x.l}</span>
+          <div style="width:70px;height:4px;background:var(--s3);border-radius:2px;overflow:hidden"><div style="height:100%;background:var(--wi);border-radius:2px;width:${(byT[x.t]/tot*100).toFixed(0)}%"></div></div>
+          <span style="font-size:12px;color:var(--go);min-width:24px;text-align:right">${byT[x.t]}</span>
+        </div>`:'').join('')}
       </div>
-      <div class="nb"><div class="nbt">Archives</div><div style="color:var(--cd);font-size:14px">${archived.length} bouteille${archived.length>1?'s':''} consommée${archived.length>1?'s':''}</div></div>
+      ${topRegions.length>1?`<div class="nb"><div class="nbt">🗺 Régions</div>
+        <div class="stat-donut">${topRegions.map(([r,n])=>`<div class="stat-pill">${r} <span>${n}</span></div>`).join('')}</div>
+      </div>`:''}
+      <div class="nb"><div class="nbt">📚 Archives</div>
+        <div style="color:var(--cd);font-size:14px">${archived.length} bouteille${archived.length>1?'s':''} consommée${archived.length>1?'s':''}</div>
+      </div>
+      <div style="height:20px"></div>
     </div>`;
   showSheet('detailSheet');
 }
