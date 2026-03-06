@@ -438,6 +438,11 @@ let wines    = JSON.parse(localStorage.getItem('cv3_wines') || '[]');
 let archived = JSON.parse(localStorage.getItem('cv3_arch')  || '[]');
 let cave     = JSON.parse(localStorage.getItem('cv3_cave')  || 'null');
 
+// ── MIGRATION : si des wines existent mais sans flag init → poser le flag sans écraser
+if(wines.length && !localStorage.getItem('cv3_init')){
+  localStorage.setItem('cv3_init','1');
+}
+
 // ── PROXY URL — auto-détection (même domaine Vercel) ──
 function getProxyUrl(){
   // Si un override manuel existe, on l'utilise
@@ -1150,12 +1155,7 @@ async function saveWine(){
   showToast(editId?'✅ Vin modifié':'🍾 Bouteille ajoutée !');
   selSlot=null;selSlots=[];enrichedData={};
   setTimeout(()=>switchTab(tab),300);
-  // Si nouveau vin sans prix marché et clé API dispo → chercher le prix en arrière-plan
-  if(isNew&&getProxyUrl()){
-    await new Promise(r=>setTimeout(r,900));
-    showToast('🔍 Recherche du prix marché…',3000);
-    await refreshPrice(wine.id);
-  }
+  // Prix : l'utilisateur clique sur 🔄 Actualiser dans la fiche pour obtenir le prix
 }
 
 // ── DETAIL ────────────────────────────────────────
@@ -1398,18 +1398,16 @@ if(!cave){
     {label:'Étage 5 — Vins du moment',cols:8},
   ]};
 }
-// Charger les démos seulement si jamais initialisé (flag 'cv3_init')
-if(!localStorage.getItem('cv3_init')){
-  if(!wines.length){
-    wines=[
+// Charger les démos seulement si jamais initialisé ET cave vide (sécurité double)
+if(!localStorage.getItem('cv3_init') && !wines.length){
+  wines=[
       {id:uid(),name:'Château Pichon Baron',domain:'Ch. Pichon Baron',year:2016,type:'red',region:'Bordeaux',app:'Pauillac',country:'France',format:750,grape:'Cab. Sauv. 70%, Merlot 30%',qty:3,price:85,gift:'',kF:2022,kT:2040,pF:2026,pT:2033,decant:90,temp:17,food:'Agneau rôti, entrecôte, fromages',score:18,notes:'Robe rubis intense. Nez de cassis, cèdre, épices. Tanins soyeux.',perso:'Acheté en 2020.',slot:'0-0',photo:null,currentPrice:115,priceSrc:'iDealwine',priceTrend:'hausse',priceUpdated:'01/03/2026',addedDate:'12/03/2024'},
       {id:uid(),name:'Meursault Les Charmes',domain:'Comtes Lafon',year:2019,type:'white',region:'Bourgogne',app:'Meursault 1er Cru',country:'France',format:750,grape:'Chardonnay 100%',qty:2,price:120,gift:'',kF:2023,kT:2033,pF:2025,pT:2030,decant:20,temp:12,food:'Homard, saint-jacques, turbot',score:19,notes:'Robe dorée. Nez beurré, noisette. Bouche minérale.',perso:'Coup de cœur.',slot:'2-0',photo:null,currentPrice:150,priceSrc:'Wine-Searcher',priceTrend:'hausse',priceUpdated:'01/03/2026',addedDate:'05/01/2024'},
       {id:uid(),name:'Billecart-Salmon Blanc de Blancs',domain:'Billecart-Salmon',year:2014,type:'champagne',region:'Champagne',app:'Blanc de Blancs GC',country:'France',format:750,grape:'Chardonnay 100%',qty:4,price:95,gift:'',kF:2022,kT:2030,pF:2024,pT:2028,decant:null,temp:8,food:'Huîtres, caviar, sushi',score:18.5,notes:'Bulles fines. Nez citronné et crayeux. Finale persistante.',perso:'Grandes occasions.',slot:'3-0',photo:null,currentPrice:112,priceSrc:'Millésima',priceTrend:'stable',priceUpdated:'01/03/2026',addedDate:'20/02/2024'},
       {id:uid(),name:'Bandol Pradeaux',domain:'Ch. Pradeaux',year:2017,type:'red',region:'Provence',app:'Bandol',country:'France',format:1500,grape:'Mourvèdre 95%',qty:2,price:75,gift:'',kF:2025,kT:2042,pF:2031,pT:2037,decant:120,temp:17,food:'Gibier, daube, fromages corsés',score:17,notes:'Fruits noirs, garrigue, olive. Tanins puissants.',perso:'Magnum — ne pas toucher avant 2031.',slot:'1-3',photo:null,currentPrice:90,priceSrc:'caviste',priceTrend:'stable',priceUpdated:'01/03/2026',addedDate:'08/06/2023'},
       {id:uid(),name:'Sancerre La Moussière',domain:'Alphonse Mellot',year:2021,type:'white',region:'Loire',app:'Sancerre',country:'France',format:750,grape:'Sauvignon Blanc 100%',qty:2,price:28,gift:'Offert par Thomas',kF:2022,kT:2027,pF:2023,pT:2025,decant:null,temp:10,food:'Chèvre, asperges, saumon',score:16.5,notes:'Groseille, buis, pierre à fusil. Finale saline.',perso:'',slot:'4-0',photo:null,currentPrice:34,priceSrc:'caviste',priceTrend:'hausse',priceUpdated:'01/03/2026',addedDate:'14/09/2023'},
       {id:uid(),name:'Côte-Rôtie La Mouline',domain:'E. Guigal',year:2015,type:'red',region:'Rhône',app:'Côte-Rôtie',country:'France',format:750,grape:'Syrah 91%, Viognier 9%',qty:1,price:280,gift:'',kF:2020,kT:2040,pF:2025,pT:2032,decant:150,temp:16,food:'Truffes, wagyu, gibier noble',score:19.5,notes:'Violette, fruits noirs. Bouche somptueuse, tanins veloutés.',perso:'Pépite de la cave. Occasion exceptionnelle.',slot:'1-0',photo:null,currentPrice:380,priceSrc:'iDealwine',priceTrend:'hausse',priceUpdated:'01/03/2026',addedDate:'10/05/2022'},
-    ];
-  }
+  ];
   save();
   localStorage.setItem('cv3_init','1');
 }
