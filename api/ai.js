@@ -129,9 +129,10 @@ IMPORTANT :
 - "kF" = année à partir de laquelle boire = ${currentYear} si le vin est déjà prêt, sinon l'année réelle
 - "kT" = année limite de consommation
 - "pF" et "pT" = fenêtre d'apogée
+- "score" = note sur 20 basée sur les critiques (Parker, RVF, Bettane+Desseauve…), ex: 18.5
 
 Réponds JSON UNIQUEMENT, sans markdown, sans commentaire :
-{"domain":"producteur","region":"région","app":"appellation","country":"France","grape":"cépages et pourcentages","kF":${currentYear},"kT":2038,"pF":2026,"pT":2032,"decant":60,"temp":16,"food":"accords mets-vins","notes":"description courte du vin","currentPrice":75,"priceSource":"estimation","priceTrend":"hausse|stable|baisse"}`;
+{"domain":"producteur","region":"région","app":"appellation","country":"France","grape":"cépages et pourcentages","kF":${currentYear},"kT":2038,"pF":2026,"pT":2032,"decant":60,"temp":16,"food":"accords mets-vins","notes":"description courte du vin","score":17.5,"currentPrice":75,"priceSource":"estimation","priceTrend":"hausse|stable|baisse"}`;
       const txt = await groqText(prompt);
       result = parseJson(txt);
 
@@ -145,9 +146,10 @@ IMPORTANT :
 - "grape" doit TOUJOURS être renseigné avec les cépages réels du vin identifié
 - "kF" = ${currentYear} si le vin est déjà prêt à boire, sinon l'année réelle
 - "kT" = année limite de consommation estimée
+- "score" = note sur 20 basée sur les critiques (Parker, RVF…), ex: 18.5
 
 Réponds JSON UNIQUEMENT, sans markdown :
-{"name":"nom/cuvée","domain":"domaine","year":2018,"type":"red|white|rose|champagne|orange|sweet|fortified|other","region":"région","app":"appellation","country":"pays","format":750,"grape":"cépages et pourcentages réels","kF":${currentYear},"kT":2035,"pF":2026,"pT":2030,"decant":90,"temp":17,"food":"accords","notes":"description","currentPrice":85,"priceSource":"estimation","priceTrend":"hausse|stable|baisse"}`;
+{"name":"nom/cuvée","domain":"domaine","year":2018,"type":"red|white|rose|champagne|orange|sweet|fortified|other","region":"région","app":"appellation","country":"pays","format":750,"grape":"cépages et pourcentages réels","kF":${currentYear},"kT":2035,"pF":2026,"pT":2030,"decant":90,"temp":17,"food":"accords","notes":"description","score":17.5,"currentPrice":85,"priceSource":"estimation","priceTrend":"hausse|stable|baisse"}`;
       const txt = await groqVision(base64, mimeType, prompt);
       result = parseJson(txt);
 
