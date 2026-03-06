@@ -9,8 +9,8 @@
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
-const MODEL_TEXT  = "gemini-2.0-flash";        // texte + grounding (web search)
-const MODEL_VIS   = "gemini-2.0-flash";        // vision (analyse étiquette)
+const MODEL_TEXT  = "gemini-2.0-flash-lite";   // texte + grounding — free tier
+const MODEL_VIS   = "gemini-2.0-flash-lite";   // vision — free tier
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
