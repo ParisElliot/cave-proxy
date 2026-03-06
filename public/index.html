@@ -1337,7 +1337,7 @@ async function refreshPrice(id){
     showToast('⚠️ Proxy non disponible'); return;
   }
   try{
-    const info=await callProxy({type:'price',name:w.name,year:w.year,domain:w.domain,app:w.app,region:w.region});
+    const info=await callProxy({type:'price',name:w.name,year:w.year,domain:w.domain,app:w.app,region:w.region,format:w.format||750});
     if(info.currentPrice){
       const i=wines.findIndex(x=>x.id===id);
       if(i>=0)Object.assign(wines[i],{currentPrice:info.currentPrice,priceRange:info.priceRange,priceSrc:info.priceSource,priceTrend:info.trend,priceNote:info.priceNote,priceUpdated:new Date().toLocaleDateString('fr-FR')});
