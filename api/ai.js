@@ -120,20 +120,34 @@ export default async function handler(req, res) {
     // ── 1. Enrichissement par nom ─────────────────────────────────────────
     if (body.type === "enrich") {
       const { name, year } = body;
+      const currentYear = new Date().getFullYear();
       const prompt = `Tu es un expert en vins. Donne les informations précises sur ce vin :
 Vin : "${name}"${year ? " millésime " + year : ""}
 
+IMPORTANT : 
+- "grape" doit TOUJOURS être renseigné avec les cépages réels (ex: "Merlot 70%, Cabernet Franc 30%")
+- "kF" = année à partir de laquelle boire = ${currentYear} si le vin est déjà prêt, sinon l'année réelle
+- "kT" = année limite de consommation
+- "pF" et "pT" = fenêtre d'apogée
+
 Réponds JSON UNIQUEMENT, sans markdown, sans commentaire :
-{"domain":"producteur","region":"région","app":"appellation","country":"France","grape":"cépages %","kF":2020,"kT":2038,"pF":2026,"pT":2032,"decant":60,"temp":16,"food":"accords mets-vins","notes":"description courte du vin","currentPrice":75,"priceSource":"estimation","priceTrend":"hausse|stable|baisse"}`;
+{"domain":"producteur","region":"région","app":"appellation","country":"France","grape":"cépages et pourcentages","kF":${currentYear},"kT":2038,"pF":2026,"pT":2032,"decant":60,"temp":16,"food":"accords mets-vins","notes":"description courte du vin","currentPrice":75,"priceSource":"estimation","priceTrend":"hausse|stable|baisse"}`;
       const txt = await groqText(prompt);
       result = parseJson(txt);
 
     // ── 2. Analyse d'étiquette (vision) ──────────────────────────────────
     } else if (body.type === "label") {
       const { base64, mimeType } = body;
+      const currentYear = new Date().getFullYear();
       const prompt = `Tu es un expert en vins. Analyse cette étiquette et extrais toutes les informations visibles.
+
+IMPORTANT :
+- "grape" doit TOUJOURS être renseigné avec les cépages réels du vin identifié
+- "kF" = ${currentYear} si le vin est déjà prêt à boire, sinon l'année réelle
+- "kT" = année limite de consommation estimée
+
 Réponds JSON UNIQUEMENT, sans markdown :
-{"name":"nom/cuvée","domain":"domaine","year":2018,"type":"red|white|rose|champagne|orange|sweet|fortified|other","region":"région","app":"appellation","country":"pays","format":750,"grape":"cépages %","kF":2022,"kT":2035,"pF":2026,"pT":2030,"decant":90,"temp":17,"food":"accords","notes":"description","currentPrice":85,"priceSource":"estimation","priceTrend":"hausse|stable|baisse"}`;
+{"name":"nom/cuvée","domain":"domaine","year":2018,"type":"red|white|rose|champagne|orange|sweet|fortified|other","region":"région","app":"appellation","country":"pays","format":750,"grape":"cépages et pourcentages réels","kF":${currentYear},"kT":2035,"pF":2026,"pT":2030,"decant":90,"temp":17,"food":"accords","notes":"description","currentPrice":85,"priceSource":"estimation","priceTrend":"hausse|stable|baisse"}`;
       const txt = await groqVision(base64, mimeType, prompt);
       result = parseJson(txt);
 
