@@ -944,8 +944,23 @@ async function enrichWineByName(name,year){
 }
 function handlePhoto(e){
   const f=e.target.files[0];if(!f)return;
+  const img=new Image();
   const r=new FileReader();
-  r.onload=ev=>{photoUrl=ev.target.result;document.getElementById('photoArea').innerHTML=`<div class="photo-prev"><img src="${photoUrl}"><button class="rm" onclick="removePhoto()">✕</button></div>`;analyzeLabel(photoUrl)};
+  r.onload=ev=>{
+    img.onload=()=>{
+      // Redimensionner max 1024px et compresser en JPEG 0.7
+      const MAX=1024;
+      let w=img.width,h=img.height;
+      if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX}else{w=Math.round(w*MAX/h);h=MAX}}
+      const canvas=document.createElement('canvas');
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      photoUrl=canvas.toDataURL('image/jpeg',0.7);
+      document.getElementById('photoArea').innerHTML=`<div class="photo-prev"><img src="${photoUrl}"><button class="rm" onclick="removePhoto()">✕</button></div>`;
+      analyzeLabel(photoUrl);
+    };
+    img.src=ev.target.result;
+  };
   r.readAsDataURL(f);
 }
 function removePhoto(){photoUrl=null;document.getElementById('photoArea').innerHTML=photoHtml();document.getElementById('aiResult').style.display='none'}
