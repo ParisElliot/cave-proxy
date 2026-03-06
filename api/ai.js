@@ -9,7 +9,7 @@
 const GROQ_KEY  = process.env.GROQ_API_KEY;
 const GROQ_BASE = "https://api.groq.com/openai/v1/chat/completions";
 const MODEL_TEXT = "llama-3.3-70b-versatile";          // texte + recherche
-const MODEL_VIS  = "meta-llama/llama-4-scout-17b-16e-instruct"; // vision
+const MODEL_VIS  = "meta-llama/llama-4-maverick-17b-128e-instruct"; // vision (meilleur OCR)
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -54,7 +54,7 @@ async function groqVision(base64, mimeType, prompt) {
     body: JSON.stringify({
       model: MODEL_VIS,
       temperature: 0.1,
-      max_tokens: 1024,
+      max_tokens: 2048,
       messages: [{
         role: "user",
         content: [
