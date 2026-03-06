@@ -989,7 +989,7 @@ function renderSlotPicker(excludeId){
   cave.etages.forEach((et,ei)=>{
     html+=`<div class="spicker-etage"><div class="spicker-lbl">${et.label||'Étage '+(ei+1)}</div><div class="spicker-row">`;
     for(let ci=0;ci<et.cols;ci++){
-      const key=slotKey(ei,ci),w=occ[key],isOcc=w&&w.id!==excludeId,isSel=selSlots.includes(key);
+      const key=slotKey(ei,ci),w=occ[key],isOcc=w&&!editIds.includes(w.id)&&w.id!==excludeId,isSel=selSlots.includes(key);
       if(isOcc) html+=`<div class="pslot occ ${w.type}" title="${w.name||''} ${w.year||''}"><span style="font-size:10px">${emo(w.type)}</span><span style="font-size:7px">${w.year?String(w.year).slice(2):''}</span></div>`;
       else html+=`<div class="pslot${isSel?' sel':''}" onclick="pickSlot('${key}','${excludeId||''}')" title="#${ci+1}"><span>${ci+1}</span></div>`;
     }
@@ -1077,7 +1077,7 @@ function buildWizRecap(){
 }
 
 function openAddWine(){
-  editId=null; photoUrl=null; enrichedData={};
+  editId=null; editIds=[]; photoUrl=null; enrichedData={};
   if(!selSlot) selSlot=null;
   document.getElementById('addTitle').textContent='Nouvelle bouteille';
   document.getElementById('saveBtn').textContent='Ajouter à ma cave';
@@ -1219,7 +1219,45 @@ async function saveWine(){
     priceUpdated:null,
     addedDate:editId?wines.find(w=>w.id===editId)?.addedDate:new Date().toLocaleDateString('fr-FR')};
   if(editId){
-    const i=wines.findIndex(w=>w.id===editId);if(i>=0)wines[i]=wine;
+    // ── MODE ÉDITION ──────────────────────────────────────────────────────
+    // Récupérer les données prix/dates de la bouteille de référence
+    const ref=wines.find(w=>w.id===editId)||{};
+    const baseWine={...wine,
+      currentPrice:ref.currentPrice||null,
+      priceSrc:ref.priceSrc||null,
+      priceTrend:ref.priceTrend||null,
+      priceUpdated:ref.priceUpdated||null,
+      addedDate:ref.addedDate||wine.addedDate,
+    };
+    const newQty=wine.qty||1;
+    const oldIds=editIds.length?editIds:[editId];
+    const oldQty=oldIds.length; // chaque entrée = 1 bouteille (qty=1 par emplacement)
+
+    if(newQty===oldIds.length && selSlots.length===0){
+      // Pas de changement de qté, pas de slots → mise à jour simple de chaque entrée
+      oldIds.forEach(id=>{
+        const i=wines.findIndex(w=>w.id===id);
+        if(i>=0) wines[i]={...baseWine,id,qty:1,slot:wines[i].slot};
+      });
+    } else {
+      // Supprimer toutes les anciennes entrées du groupe
+      wines=wines.filter(w=>!oldIds.includes(w.id));
+      // Recréer selon la nouvelle qty et les nouveaux emplacements
+      if(newQty>0){
+        if(selSlots.length>0){
+          // Créer une entrée par emplacement sélectionné
+          selSlots.forEach(slot=>{
+            wines.push({...baseWine,id:uid(),qty:1,slot});
+          });
+          // S'il reste des bouteilles sans emplacement
+          const remaining=newQty-selSlots.length;
+          for(let i=0;i<remaining;i++) wines.push({...baseWine,id:uid(),qty:1,slot:null});
+        } else {
+          // Pas de slots → une seule entrée avec qty
+          wines.push({...baseWine,id:uid(),qty:newQty,slot:null});
+        }
+      }
+    }
   } else {
     const qty=wine.qty||1;
     if(qty>1&&selSlots.length>0){
@@ -1237,7 +1275,7 @@ async function saveWine(){
   save();closeAll();
   const isNew=!editId;
   showToast(editId?'✅ Vin modifié':'🍾 Bouteille ajoutée !');
-  selSlot=null;selSlots=[];enrichedData={};
+  selSlot=null;selSlots=[];enrichedData={};editIds=[];
   setTimeout(()=>switchTab(tab),300);
   // Prix : l'utilisateur clique sur 🔄 Actualiser dans la fiche pour obtenir le prix
 }
@@ -1308,7 +1346,7 @@ function renderDetailGroup(ws){
           ? `<button class="btn-drink" onclick="drinkOneWine('${ids[0]}','${ids.join(',')}')">🍷 Marquer 1 bouteille comme bue</button>`
           : `<button class="btn-drink" onclick="drinkWine('${ids[0]}')">🍷 Marquer comme bue</button>`
         }
-        <button class="bsm bedit" onclick="editWine('${w.id}')">✏️</button>
+        <button class="bsm bedit" onclick="editWine('${ids.join(',')}')" >✏️</button>
         <button class="bsm bdel" id="bdel_${w.id}" onclick="delWine('${w.id}')">🗑</button>
       </div>
       <div style="height:20px"></div>
@@ -1369,21 +1407,31 @@ async function refreshAllPrices(){
 }
 
 // ── EDIT / DRINK / DELETE ─────────────────────────
-function editWine(id){
-  const w=wines.find(x=>x.id===id);if(!w)return;
+// editIds = liste de tous les ids du groupe (séparés par virgule)
+let editIds=[];
+function editWine(idStr){
+  const ids=idStr.split(',');
+  const w=wines.find(x=>x.id===ids[0]);if(!w)return;
   closeSheet('detailSheet');
-  editId=id;selSlot=w.slot||null;selSlots=w.slot?[w.slot]:[];photoUrl=w.photo||null;enrichedData={};
+  editIds=ids;
+  editId=ids[0]; // id de référence pour la compat existante
+  // Pré-charger tous les emplacements du groupe
+  selSlots=ids.map(id=>wines.find(x=>x.id===id)?.slot).filter(Boolean);
+  selSlot=selSlots[0]||null;
+  photoUrl=w.photo||null;enrichedData={};
   document.getElementById('addTitle').textContent='Modifier le vin';
   document.getElementById('saveBtn').textContent='Enregistrer';
   clearForm();
+  // Remplir qty avec le total du groupe
+  const totalQty=ids.reduce((a,id)=>{const x=wines.find(w=>w.id===id);return a+(x?+x.qty||1:0);},0);
   fillForm(w);
+  document.getElementById('f_qty').value=totalQty;
   document.getElementById('photoArea').innerHTML=w.photo?`<div class="photo-prev"><img src="${w.photo}"><button class="rm" onclick="removePhoto()">✕</button></div>`:photoHtml();
   document.getElementById('aiResult').style.display='none';
   document.getElementById('enrichResult').style.display='none';
   window._aip=w.currentPrice;window._aisrc=w.priceSrc;window._aitrend=w.priceTrend;
   lastSearchedName=w.name+(w.year?' '+w.year:'');
-  // En mode édition on va directement à l'étape 2 (tous les champs déjà remplis)
-  renderSlotPicker(id);
+  renderSlotPicker(ids[0]);
   setTimeout(()=>{showSheet('addSheet');wizGoStep(2);updateSlotLbl();},120);
 }
 function drinkWine(id){
