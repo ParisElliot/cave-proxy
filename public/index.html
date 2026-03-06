@@ -262,7 +262,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font-
       <div class="hacts">
         <div class="ibtn" onclick="openStats()">📊</div>
         <div class="ibtn" id="globalRefBtn" onclick="refreshAllPrices()">🔄</div>
-        <div class="ibtn" onclick="openApiConfig()" title="Clé API">🔑</div>
       </div>
     </div>
     <div class="srch" id="srchWrap" style="display:none">
@@ -429,21 +428,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font-
   <div class="sb" id="caveSheetBody"></div>
 </div>
 
-<!-- API KEY MODAL -->
-<div id="apiModal" class="hidden">
-  <div class="api-box">
-    <div class="api-logo">Ma <span>Cave</span></div>
-    <div class="api-sub">Proxy IA</div>
-    <div class="api-label">🔗 URL du proxy (optionnel)</div>
-    <input class="api-input" id="apiKeyInput" type="url" placeholder="Laisse vide — auto-détecté" autocomplete="off" spellcheck="false">
-    <div class="api-hint">
-      L'app détecte automatiquement le proxy si elle est hébergée sur Vercel.<br>
-      Laisse ce champ <b style="color:var(--go)">vide</b> si tu accèdes via <b style="color:var(--go)">cave-proxy.vercel.app</b><br>
-      <span style="color:var(--td)">Remplis uniquement si tu utilises un domaine différent.</span>
-    </div>
-    <button class="btn btnp" onclick="saveApiKey()" style="margin-top:20px">Enregistrer et continuer</button>
-  </div>
-</div>
+
 
 <div class="toast" id="toast"></div>
 
@@ -462,19 +447,7 @@ function getProxyUrl(){
   return window.location.origin;
 }
 
-function openApiConfig(){
-  // Affiche l'URL actuelle dans le champ (juste pour info)
-  document.getElementById('apiKeyInput').value=localStorage.getItem('cv3_proxy')||'';
-  document.getElementById('apiModal').classList.remove('hidden');
-}
-function saveApiKey(){
-  const k=document.getElementById('apiKeyInput').value.trim();
-  if(k&&!k.startsWith('https://')){showToast('⚠️ URL invalide (doit commencer par https://)');return}
-  if(k) localStorage.setItem('cv3_proxy',k.replace(/\/$/,''));
-  else localStorage.removeItem('cv3_proxy');
-  document.getElementById('apiModal').classList.add('hidden');
-  showToast('✅ Configuré !');
-}
+
 
 // ── APPEL PROXY ───────────────────────────────────
 async function callProxy(payload){
@@ -1115,7 +1088,7 @@ async function analyzeLabel(url){
   const div=document.getElementById('aiResult');div.style.display='block';
   if(!getProxyUrl()){
     div.innerHTML=`<div style="background:rgba(139,26,46,.1);border:1px solid rgba(139,26,46,.3);border-radius:var(--rs);padding:11px;margin-bottom:12px;font-size:12px;color:#e88">
-      🔗 Proxy non configuré — <span style="color:var(--go);cursor:pointer;text-decoration:underline" onclick="openApiConfig()">Configurer maintenant</span>
+      🔗 Proxy non configuré — <span style="color:var(--go);cursor:pointer;text-decoration:underline">Configurer maintenant</span>
     </div>`;
     return;
   }
@@ -1281,7 +1254,7 @@ async function refreshPrice(id){
   if(pval)pval.innerHTML=`<span style="font-size:13px;color:var(--td)">Recherche…</span>`;
   if(!getProxyUrl()){
     if(btn){btn.innerHTML='🔗';btn.classList.remove('loading');setTimeout(()=>{btn.innerHTML='🔄 Actualiser';btn.classList.remove('loading')},2500)}
-    showToast('🔗 Proxy non configuré'); openApiConfig(); return;
+    showToast('⚠️ Proxy non disponible'); return;
   }
   try{
     const info=await callProxy({type:'price',name:w.name,year:w.year,domain:w.domain,app:w.app,region:w.region});
@@ -1428,16 +1401,20 @@ if(!cave){
     {label:'Étage 5 — Vins du moment',cols:8},
   ]};
 }
-if(!wines.length){
-  wines=[
-    {id:uid(),name:'Château Pichon Baron',domain:'Ch. Pichon Baron',year:2016,type:'red',region:'Bordeaux',app:'Pauillac',country:'France',format:750,grape:'Cab. Sauv. 70%, Merlot 30%',qty:3,price:85,gift:'',kF:2022,kT:2040,pF:2026,pT:2033,decant:90,temp:17,food:'Agneau rôti, entrecôte, fromages',score:18,notes:'Robe rubis intense. Nez de cassis, cèdre, épices. Tanins soyeux.',perso:'Acheté en 2020.',slot:'0-0',photo:null,currentPrice:115,priceSrc:'iDealwine',priceTrend:'hausse',priceUpdated:'01/03/2026',addedDate:'12/03/2024'},
-    {id:uid(),name:'Meursault Les Charmes',domain:'Comtes Lafon',year:2019,type:'white',region:'Bourgogne',app:'Meursault 1er Cru',country:'France',format:750,grape:'Chardonnay 100%',qty:2,price:120,gift:'',kF:2023,kT:2033,pF:2025,pT:2030,decant:20,temp:12,food:'Homard, saint-jacques, turbot',score:19,notes:'Robe dorée. Nez beurré, noisette. Bouche minérale.',perso:'Coup de cœur.',slot:'2-0',photo:null,currentPrice:150,priceSrc:'Wine-Searcher',priceTrend:'hausse',priceUpdated:'01/03/2026',addedDate:'05/01/2024'},
-    {id:uid(),name:'Billecart-Salmon Blanc de Blancs',domain:'Billecart-Salmon',year:2014,type:'champagne',region:'Champagne',app:'Blanc de Blancs GC',country:'France',format:750,grape:'Chardonnay 100%',qty:4,price:95,gift:'',kF:2022,kT:2030,pF:2024,pT:2028,decant:null,temp:8,food:'Huîtres, caviar, sushi',score:18.5,notes:'Bulles fines. Nez citronné et crayeux. Finale persistante.',perso:'Grandes occasions.',slot:'3-0',photo:null,currentPrice:112,priceSrc:'Millésima',priceTrend:'stable',priceUpdated:'01/03/2026',addedDate:'20/02/2024'},
-    {id:uid(),name:'Bandol Pradeaux',domain:'Ch. Pradeaux',year:2017,type:'red',region:'Provence',app:'Bandol',country:'France',format:1500,grape:'Mourvèdre 95%',qty:2,price:75,gift:'',kF:2025,kT:2042,pF:2031,pT:2037,decant:120,temp:17,food:'Gibier, daube, fromages corsés',score:17,notes:'Fruits noirs, garrigue, olive. Tanins puissants.',perso:'Magnum — ne pas toucher avant 2031.',slot:'1-3',photo:null,currentPrice:90,priceSrc:'caviste',priceTrend:'stable',priceUpdated:'01/03/2026',addedDate:'08/06/2023'},
-    {id:uid(),name:'Sancerre La Moussière',domain:'Alphonse Mellot',year:2021,type:'white',region:'Loire',app:'Sancerre',country:'France',format:750,grape:'Sauvignon Blanc 100%',qty:2,price:28,gift:'Offert par Thomas',kF:2022,kT:2027,pF:2023,pT:2025,decant:null,temp:10,food:'Chèvre, asperges, saumon',score:16.5,notes:'Groseille, buis, pierre à fusil. Finale saline.',perso:'',slot:'4-0',photo:null,currentPrice:34,priceSrc:'caviste',priceTrend:'hausse',priceUpdated:'01/03/2026',addedDate:'14/09/2023'},
-    {id:uid(),name:'Côte-Rôtie La Mouline',domain:'E. Guigal',year:2015,type:'red',region:'Rhône',app:'Côte-Rôtie',country:'France',format:750,grape:'Syrah 91%, Viognier 9%',qty:1,price:280,gift:'',kF:2020,kT:2040,pF:2025,pT:2032,decant:150,temp:16,food:'Truffes, wagyu, gibier noble',score:19.5,notes:'Violette, fruits noirs. Bouche somptueuse, tanins veloutés.',perso:'Pépite de la cave. Occasion exceptionnelle.',slot:'1-0',photo:null,currentPrice:380,priceSrc:'iDealwine',priceTrend:'hausse',priceUpdated:'01/03/2026',addedDate:'10/05/2022'},
-  ];
+// Charger les démos seulement si jamais initialisé (flag 'cv3_init')
+if(!localStorage.getItem('cv3_init')){
+  if(!wines.length){
+    wines=[
+      {id:uid(),name:'Château Pichon Baron',domain:'Ch. Pichon Baron',year:2016,type:'red',region:'Bordeaux',app:'Pauillac',country:'France',format:750,grape:'Cab. Sauv. 70%, Merlot 30%',qty:3,price:85,gift:'',kF:2022,kT:2040,pF:2026,pT:2033,decant:90,temp:17,food:'Agneau rôti, entrecôte, fromages',score:18,notes:'Robe rubis intense. Nez de cassis, cèdre, épices. Tanins soyeux.',perso:'Acheté en 2020.',slot:'0-0',photo:null,currentPrice:115,priceSrc:'iDealwine',priceTrend:'hausse',priceUpdated:'01/03/2026',addedDate:'12/03/2024'},
+      {id:uid(),name:'Meursault Les Charmes',domain:'Comtes Lafon',year:2019,type:'white',region:'Bourgogne',app:'Meursault 1er Cru',country:'France',format:750,grape:'Chardonnay 100%',qty:2,price:120,gift:'',kF:2023,kT:2033,pF:2025,pT:2030,decant:20,temp:12,food:'Homard, saint-jacques, turbot',score:19,notes:'Robe dorée. Nez beurré, noisette. Bouche minérale.',perso:'Coup de cœur.',slot:'2-0',photo:null,currentPrice:150,priceSrc:'Wine-Searcher',priceTrend:'hausse',priceUpdated:'01/03/2026',addedDate:'05/01/2024'},
+      {id:uid(),name:'Billecart-Salmon Blanc de Blancs',domain:'Billecart-Salmon',year:2014,type:'champagne',region:'Champagne',app:'Blanc de Blancs GC',country:'France',format:750,grape:'Chardonnay 100%',qty:4,price:95,gift:'',kF:2022,kT:2030,pF:2024,pT:2028,decant:null,temp:8,food:'Huîtres, caviar, sushi',score:18.5,notes:'Bulles fines. Nez citronné et crayeux. Finale persistante.',perso:'Grandes occasions.',slot:'3-0',photo:null,currentPrice:112,priceSrc:'Millésima',priceTrend:'stable',priceUpdated:'01/03/2026',addedDate:'20/02/2024'},
+      {id:uid(),name:'Bandol Pradeaux',domain:'Ch. Pradeaux',year:2017,type:'red',region:'Provence',app:'Bandol',country:'France',format:1500,grape:'Mourvèdre 95%',qty:2,price:75,gift:'',kF:2025,kT:2042,pF:2031,pT:2037,decant:120,temp:17,food:'Gibier, daube, fromages corsés',score:17,notes:'Fruits noirs, garrigue, olive. Tanins puissants.',perso:'Magnum — ne pas toucher avant 2031.',slot:'1-3',photo:null,currentPrice:90,priceSrc:'caviste',priceTrend:'stable',priceUpdated:'01/03/2026',addedDate:'08/06/2023'},
+      {id:uid(),name:'Sancerre La Moussière',domain:'Alphonse Mellot',year:2021,type:'white',region:'Loire',app:'Sancerre',country:'France',format:750,grape:'Sauvignon Blanc 100%',qty:2,price:28,gift:'Offert par Thomas',kF:2022,kT:2027,pF:2023,pT:2025,decant:null,temp:10,food:'Chèvre, asperges, saumon',score:16.5,notes:'Groseille, buis, pierre à fusil. Finale saline.',perso:'',slot:'4-0',photo:null,currentPrice:34,priceSrc:'caviste',priceTrend:'hausse',priceUpdated:'01/03/2026',addedDate:'14/09/2023'},
+      {id:uid(),name:'Côte-Rôtie La Mouline',domain:'E. Guigal',year:2015,type:'red',region:'Rhône',app:'Côte-Rôtie',country:'France',format:750,grape:'Syrah 91%, Viognier 9%',qty:1,price:280,gift:'',kF:2020,kT:2040,pF:2025,pT:2032,decant:150,temp:16,food:'Truffes, wagyu, gibier noble',score:19.5,notes:'Violette, fruits noirs. Bouche somptueuse, tanins veloutés.',perso:'Pépite de la cave. Occasion exceptionnelle.',slot:'1-0',photo:null,currentPrice:380,priceSrc:'iDealwine',priceTrend:'hausse',priceUpdated:'01/03/2026',addedDate:'10/05/2022'},
+    ];
+  }
   save();
+  localStorage.setItem('cv3_init','1');
 }
 switchTab('cave');
 // Afficher la config clé API au premier lancement
