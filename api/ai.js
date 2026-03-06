@@ -1,16 +1,15 @@
 /**
- * Proxy Vercel → Gemini API
+ * Proxy Vercel → Groq API
  * Route unique : POST /api/ai
- * La clé Gemini reste côté serveur dans la variable d'environnement GEMINI_API_KEY
+ * La clé Groq reste côté serveur dans GROQ_API_KEY
  *
- * Corps attendu (JSON) :
- *   { type: "enrich" | "label" | "price", ...payload }
+ * Corps attendu : { type: "enrich" | "label" | "price", ...payload }
  */
 
-const GEMINI_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
-const MODEL_TEXT  = "gemini-2.0-flash-lite";   // texte + grounding — free tier
-const MODEL_VIS   = "gemini-2.0-flash-lite";   // vision — free tier
+const GROQ_KEY  = process.env.GROQ_API_KEY;
+const GROQ_BASE = "https://api.groq.com/openai/v1/chat/completions";
+const MODEL_TEXT = "llama-3.3-70b-versatile";          // texte + recherche
+const MODEL_VIS  = "meta-llama/llama-4-scout-17b-16e-instruct"; // vision
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -23,49 +22,55 @@ function corsHeaders() {
   };
 }
 
-async function geminiText(prompt, useGrounding = true) {
-  const body = {
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
-  };
-  if (useGrounding) {
-    body.tools = [{ google_search: {} }];
-  }
-  const url = `${GEMINI_BASE}/${MODEL_TEXT}:generateContent?key=${GEMINI_KEY}`;
-  const res = await fetch(url, {
+async function groqText(prompt) {
+  const res = await fetch(GROQ_BASE, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  return data.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "";
-}
-
-async function geminiVision(base64, mimeType, prompt) {
-  const body = {
-    contents: [{
-      role: "user",
-      parts: [
-        { inline_data: { mime_type: mimeType, data: base64 } },
-        { text: prompt },
-      ],
-    }],
-    generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
-  };
-  const url = `${GEMINI_BASE}/${MODEL_VIS}:generateContent?key=${GEMINI_KEY}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${GROQ_KEY}`,
+    },
+    body: JSON.stringify({
+      model: MODEL_TEXT,
+      temperature: 0.2,
+      max_tokens: 1024,
+      messages: [{ role: "user", content: prompt }],
+    }),
   });
   const data = await res.json();
   if (data.error) {
-    console.error("Gemini Vision error:", JSON.stringify(data.error));
+    console.error("Groq text error:", JSON.stringify(data.error));
     throw new Error(data.error.message);
   }
-  const text = data.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "";
-  console.log("Gemini Vision response:", text.slice(0, 200));
+  return data.choices?.[0]?.message?.content || "";
+}
+
+async function groqVision(base64, mimeType, prompt) {
+  const res = await fetch(GROQ_BASE, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${GROQ_KEY}`,
+    },
+    body: JSON.stringify({
+      model: MODEL_VIS,
+      temperature: 0.1,
+      max_tokens: 1024,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } },
+          { type: "text", text: prompt },
+        ],
+      }],
+    }),
+  });
+  const data = await res.json();
+  if (data.error) {
+    console.error("Groq vision error:", JSON.stringify(data.error));
+    throw new Error(data.error.message);
+  }
+  const text = data.choices?.[0]?.message?.content || "";
+  console.log("Groq vision response:", text.slice(0, 200));
   return text;
 }
 
@@ -82,7 +87,6 @@ function parseJson(txt) {
 // ── Handler principal ────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
-  // CORS preflight
   if (req.method === "OPTIONS") {
     res.writeHead(204, corsHeaders());
     res.end();
@@ -95,9 +99,9 @@ export default async function handler(req, res) {
     return;
   }
 
-  if (!GEMINI_KEY) {
+  if (!GROQ_KEY) {
     res.writeHead(500, corsHeaders());
-    res.end(JSON.stringify({ error: "GEMINI_API_KEY non configurée sur le serveur" }));
+    res.end(JSON.stringify({ error: "GROQ_API_KEY non configurée sur le serveur" }));
     return;
   }
 
@@ -113,37 +117,41 @@ export default async function handler(req, res) {
   try {
     let result = {};
 
-    // ── 1. Enrichissement par nom (web search) ────────────────────────────
+    // ── 1. Enrichissement par nom ─────────────────────────────────────────
     if (body.type === "enrich") {
       const { name, year } = body;
-      const prompt = `Vin : "${name}"${year ? " millésime " + year : ""}
-Recherche ses informations précises sur Wine-Searcher, iDealwine, Millésima ou le site du domaine.
+      const prompt = `Tu es un expert en vins. Donne les informations précises sur ce vin :
+Vin : "${name}"${year ? " millésime " + year : ""}
+
 Réponds JSON UNIQUEMENT, sans markdown, sans commentaire :
-{"domain":"producteur","region":"région","app":"appellation","country":"France","grape":"cépages %","kF":2020,"kT":2038,"pF":2026,"pT":2032,"decant":60,"temp":16,"food":"accords mets-vins","notes":"description courte du vin","currentPrice":75,"priceSource":"Wine-Searcher","priceTrend":"hausse|stable|baisse"}`;
-      const txt = await geminiText(prompt, true);
+{"domain":"producteur","region":"région","app":"appellation","country":"France","grape":"cépages %","kF":2020,"kT":2038,"pF":2026,"pT":2032,"decant":60,"temp":16,"food":"accords mets-vins","notes":"description courte du vin","currentPrice":75,"priceSource":"estimation","priceTrend":"hausse|stable|baisse"}`;
+      const txt = await groqText(prompt);
       result = parseJson(txt);
 
     // ── 2. Analyse d'étiquette (vision) ──────────────────────────────────
     } else if (body.type === "label") {
       const { base64, mimeType } = body;
-      const prompt = `Analyse cette étiquette de vin. Réponds JSON UNIQUEMENT, sans markdown :
-{"name":"nom/cuvée","domain":"domaine","year":2018,"type":"red|white|rose|champagne|orange|sweet|fortified|other","region":"région","app":"appellation","country":"pays","format":750,"grape":"cépages %","kF":2022,"kT":2035,"pF":2026,"pT":2030,"decant":90,"temp":17,"food":"accords","notes":"description","currentPrice":85,"priceSource":"source","priceTrend":"hausse|stable|baisse"}`;
-      const txt = await geminiVision(base64, mimeType, prompt);
+      const prompt = `Tu es un expert en vins. Analyse cette étiquette et extrais toutes les informations visibles.
+Réponds JSON UNIQUEMENT, sans markdown :
+{"name":"nom/cuvée","domain":"domaine","year":2018,"type":"red|white|rose|champagne|orange|sweet|fortified|other","region":"région","app":"appellation","country":"pays","format":750,"grape":"cépages %","kF":2022,"kT":2035,"pF":2026,"pT":2030,"decant":90,"temp":17,"food":"accords","notes":"description","currentPrice":85,"priceSource":"estimation","priceTrend":"hausse|stable|baisse"}`;
+      const txt = await groqVision(base64, mimeType, prompt);
       result = parseJson(txt);
 
-    // ── 3. Recherche de prix (web search) ────────────────────────────────
+    // ── 3. Recherche de prix ──────────────────────────────────────────────
     } else if (body.type === "price") {
       const { name, year, domain, app, region } = body;
-      const prompt = `Prix actuel marché 2025-2026 du vin : "${name}"${year ? " " + year : ""}${domain ? " · " + domain : ""}${app ? " · " + app : (region ? " · " + region : "")}
-Cherche sur Wine-Searcher, iDealwine, Millésima, cavistes en ligne.
+      const prompt = `Tu es un expert en vins. Estime le prix actuel marché 2025-2026 de ce vin :
+"${name}"${year ? " " + year : ""}${domain ? " · " + domain : ""}${app ? " · " + app : (region ? " · " + region : "")}
+
+Base-toi sur ta connaissance des prix Wine-Searcher, iDealwine, Millésima.
 Réponds JSON UNIQUEMENT, sans markdown :
-{"currentPrice":85,"priceRange":"70-100€","priceSource":"Wine-Searcher","trend":"hausse|stable|baisse","priceNote":"contexte court"}`;
-      const txt = await geminiText(prompt, true);
+{"currentPrice":85,"priceRange":"70-100€","priceSource":"estimation experte","trend":"hausse|stable|baisse","priceNote":"contexte court"}`;
+      const txt = await groqText(prompt);
       result = parseJson(txt);
 
     } else {
       res.writeHead(400, corsHeaders());
-      res.end(JSON.stringify({ error: "type inconnu : utilisez enrich | label | price" }));
+      res.end(JSON.stringify({ error: "type inconnu : enrich | label | price" }));
       return;
     }
 
