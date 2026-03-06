@@ -475,7 +475,7 @@ async function callProxy(payload){
 }
 // cave = { name:string, etages:[ {label:string, cols:number} ] }
 
-let editId=null, selSlot=null, photoUrl=null, tab='cave', filter='all', advIdx=0;
+let editId=null, selSlot=null, selSlots=[], photoUrl=null, tab='cave', filter='all', advIdx=0;
 let dragSrc=null;
 const Y=new Date().getFullYear();
 
@@ -792,6 +792,8 @@ function saveCave(){
 }
 
 // ── SLOT PICKER ───────────────────────────────────
+function getQty(){ return parseInt(document.getElementById('f_qty')?.value)||1; }
+
 function renderSlotPicker(excludeId){
   const area=document.getElementById('slotPickerArea');
   if(!cave){
@@ -801,12 +803,13 @@ function renderSlotPicker(excludeId){
     </div>`;
     return;
   }
+  const qty=getQty();
   const occ=occMap();
-  let html='<div class="spicker">';
+  let html=`<div class="spicker"><div style="font-size:11px;color:var(--go);margin-bottom:10px;font-weight:500">Sélectionne ${qty} emplacement${qty>1?'s':''} <span style="color:var(--td)">(${selSlots.length}/${qty} choisi${selSlots.length>1?'s':''})</span></div>`;
   cave.etages.forEach((et,ei)=>{
     html+=`<div class="spicker-etage"><div class="spicker-lbl">${et.label||'Étage '+(ei+1)}</div><div class="spicker-row">`;
     for(let ci=0;ci<et.cols;ci++){
-      const key=slotKey(ei,ci),w=occ[key],isOcc=w&&w.id!==excludeId,isSel=selSlot===key;
+      const key=slotKey(ei,ci),w=occ[key],isOcc=w&&w.id!==excludeId,isSel=selSlots.includes(key);
       if(isOcc) html+=`<div class="pslot occ ${w.type}" title="${w.name||''} ${w.year||''}"><span style="font-size:10px">${emo(w.type)}</span><span style="font-size:7px">${w.year?String(w.year).slice(2):''}</span></div>`;
       else html+=`<div class="pslot${isSel?' sel':''}" onclick="pickSlot('${key}','${excludeId||''}')" title="#${ci+1}"><span>${ci+1}</span></div>`;
     }
@@ -814,13 +817,22 @@ function renderSlotPicker(excludeId){
   });
   html+='</div>';
   area.innerHTML=html;
+  updateSlotLbl();
 }
 function pickSlot(key,exId){
-  selSlot=key;
-  const[ei,ci]=key.split('-').map(Number);
-  const et=cave?.etages[ei];
-  document.getElementById('selSlotLbl').textContent=`${et?.label||'Étage '+(ei+1)} · Position ${ci+1}`;
+  const qty=getQty();
+  const idx=selSlots.indexOf(key);
+  if(idx>=0){ selSlots.splice(idx,1); }
+  else if(selSlots.length<qty){ selSlots.push(key); }
+  else { selSlots.shift(); selSlots.push(key); } // remplace le plus ancien
+  selSlot=selSlots[0]||null;
   renderSlotPicker(exId);
+}
+function updateSlotLbl(){
+  const lbl=document.getElementById('selSlotLbl'); if(!lbl) return;
+  if(!selSlots.length){lbl.textContent='Aucun';return;}
+  const labels=selSlots.map(k=>{const[ei,ci]=k.split('-').map(Number);const et=cave?.etages[ei];return `${et?.label?.split('—')[0]?.trim()||'É'+(ei+1)}·${ci+1}`;});
+  lbl.textContent=labels.join(', ');
 }
 
 // ── ADD / EDIT WINE ───────────────────────────────
@@ -829,23 +841,40 @@ function photoHtml(){ return `<div class="photo-up"><div class="icon">📸</div>
 // ── WIZARD STATE ──────────────────────────────────
 let wizStep=1, nameSearchTimer=null, lastSearchedName='', enrichedData={};
 
+// Remplit tous les champs page 2 depuis un objet info (label ou enrich)
+function applyEnrichedToForm(info){
+  const sv=(id,v)=>{if(v!=null&&v!==''){const e=document.getElementById(id);if(e&&!e.value)e.value=v}};
+  const svf=(id,v)=>{if(v!=null&&v!==''){const e=document.getElementById(id);if(e)e.value=v}};
+  // Page 1
+  sv('f_name',info.name);sv('f_year',info.year);
+  if(info.type){const el=document.getElementById('f_type');if(el&&!el.value)el.value=info.type;}
+  // Page 2
+  sv('f_domain',info.domain);sv('f_region',info.region);sv('f_app',info.app);
+  sv('f_country',info.country||'France');
+  if(info.format){const el=document.getElementById('f_format');if(el)el.value=info.format;}
+  svf('f_grape',info.grape);
+  svf('f_kF',info.kF||new Date().getFullYear());
+  sv('f_kT',info.kT);sv('f_pF',info.pF);sv('f_pT',info.pT);
+  svf('f_dec',info.decant);svf('f_temp',info.temp);
+  svf('f_food',info.food);svf('f_notes',info.notes);
+}
+
 function wizGoStep(n){
   wizStep=n;
   document.getElementById('wizStep1').style.display=n===1?'':'none';
   document.getElementById('wizStep2').style.display=n===2?'':'none';
   document.getElementById('wizStepLbl').textContent=`Étape ${n} sur 2`;
   document.getElementById('wizBar').style.width=n===1?'50%':'100%';
-  if(n===2) buildWizRecap();
+  if(n===2){buildWizRecap();setTimeout(()=>{renderSlotPicker(editId||null);updateSlotLbl();},50);}
 }
 
 function wizNext(){
   const name=document.getElementById('f_name').value.trim();
   if(!name){showToast('⚠️ Entrez un nom de vin');return}
   renderSlotPicker(editId||null);
-  const lbl=document.getElementById('selSlotLbl');
-  if(selSlot&&cave){const[ei,ci]=selSlot.split('-').map(Number);const et=cave.etages[ei];lbl.textContent=`${et?.label||'Étage '+(ei+1)} · Position ${ci+1}`}
-  else lbl.textContent='Aucun';
   wizGoStep(2);
+  // Appliquer les données enrichies maintenant que la page 2 est dans le DOM
+  if(Object.keys(enrichedData).length) applyEnrichedToForm(enrichedData);
   // Scroll to top of sheet
   document.getElementById('addSheet').scrollTop=0;
 }
@@ -876,7 +905,7 @@ function openAddWine(){
   document.getElementById('aiResult').style.display='none';
   document.getElementById('enrichResult').style.display='none';
   document.getElementById('photoArea').innerHTML=photoHtml();
-  lastSearchedName='';
+  lastSearchedName='';selSlots=[];
   wizGoStep(1);
   showSheet('addSheet');
 }
@@ -924,12 +953,10 @@ async function enrichWineByName(name,year){
     const info=await callProxy({type:'enrich',name,year});
     enrichedData=info;
     // Remplir les champs silencieusement (sans écraser ce que l'utilisateur a saisi)
-    const fill=(id,v)=>{const e=document.getElementById(id);if(e&&!e.value&&v!=null)e.value=v};
-    fill('f_domain',info.domain);fill('f_region',info.region);fill('f_app',info.app);
-    fill('f_country',info.country);fill('f_grape',info.grape);
-    fill('f_kF',info.kF);fill('f_kT',info.kT);fill('f_pF',info.pF);fill('f_pT',info.pT);
-    fill('f_dec',info.decant);fill('f_temp',info.temp);fill('f_food',info.food);fill('f_notes',info.notes);
+    enrichedData=info;
     window._aip=info.currentPrice;window._aisrc=info.priceSource;window._aitrend=info.priceTrend;
+    // Remplir les champs déjà visibles (page 1 + page 2 si ouverte)
+    applyEnrichedToForm(info);
     if(div){
       div.innerHTML=`<div style="background:rgba(74,124,89,.1);border:1px solid rgba(74,124,89,.3);border-radius:var(--rs);padding:11px;margin-bottom:4px">
         <div style="font-size:10px;color:var(--grL);letter-spacing:1px;font-weight:600;margin-bottom:3px">✅ Vin enrichi automatiquement</div>
@@ -982,14 +1009,15 @@ async function analyzeLabel(url){
       <div style="font-family:'Cormorant Garamond',serif;font-size:17px;color:var(--cr)">${info.name||'Vin identifié'}</div>
       ${info.currentPrice?`<div style="font-size:11px;color:var(--go);margin-top:3px">~${info.currentPrice}€ · ${info.priceSource||'marché'}</div>`:''}
     </div>`;
-    const sv=(id,v)=>{if(v!=null){const e=document.getElementById(id);if(e)e.value=v}};
-    sv('f_name',info.name);sv('f_domain',info.domain);sv('f_year',info.year);
-    if(info.type)document.getElementById('f_type').value=info.type;
-    sv('f_region',info.region);sv('f_app',info.app);sv('f_country',info.country);
-    if(info.format)document.getElementById('f_format').value=info.format;
-    sv('f_grape',info.grape);sv('f_kF',info.kF);sv('f_kT',info.kT);sv('f_pF',info.pF);sv('f_pT',info.pT);
-    sv('f_dec',info.decant);sv('f_temp',info.temp);sv('f_food',info.food);sv('f_notes',info.notes);
+    // Stocker dans enrichedData pour remplir page 2 quand elle s'affiche
+    enrichedData=info;
     window._aip=info.currentPrice;window._aisrc=info.priceSource;window._aitrend=info.priceTrend;
+    // Remplir les champs page 1 (toujours présents)
+    const sv=(id,v)=>{if(v!=null){const e=document.getElementById(id);if(e)e.value=v}};
+    sv('f_name',info.name);sv('f_year',info.year);
+    if(info.type){const el=document.getElementById('f_type');if(el)el.value=info.type;}
+    // Remplir page 2 si déjà visible (mode édition), sinon sera fait dans wizNext
+    applyEnrichedToForm(info);
     showToast('✅ Vin identifié !');
   }catch(err){
     div.innerHTML=`<div style="background:rgba(139,26,46,.1);border:1px solid rgba(139,26,46,.3);border-radius:var(--rs);padding:9px;margin-bottom:12px;font-size:12px;color:#e88">⚠️ Analyse impossible — remplissez manuellement</div>`;
@@ -1006,17 +1034,32 @@ async function saveWine(){
     grape:g('f_grape')||'',qty:ni(g('f_qty'))||1,price:n(g('f_price')),gift:g('f_gift')||'',
     kF:ni(g('f_kF')),kT:ni(g('f_kT')),pF:ni(g('f_pF')),pT:ni(g('f_pT')),decant:ni(g('f_dec')),temp:ni(g('f_temp')),
     food:g('f_food')||'',score:n(g('f_score')),notes:g('f_notes')||'',perso:g('f_perso')||'',
-    slot:selSlot,photo:photoUrl,
+    slot:selSlots[0]||selSlot||null,photo:photoUrl,
     currentPrice:window._aip||enrichedData.currentPrice||null,
     priceSrc:window._aisrc||enrichedData.priceSource||null,
     priceTrend:window._aitrend||enrichedData.priceTrend||null,
     priceUpdated:(window._aip||enrichedData.currentPrice)?new Date().toLocaleDateString('fr-FR'):null,
     addedDate:editId?wines.find(w=>w.id===editId)?.addedDate:new Date().toLocaleDateString('fr-FR')};
-  if(editId){const i=wines.findIndex(w=>w.id===editId);if(i>=0)wines[i]=wine}else wines.push(wine);
+  if(editId){
+    const i=wines.findIndex(w=>w.id===editId);if(i>=0)wines[i]=wine;
+  } else {
+    const qty=wine.qty||1;
+    if(qty>1&&selSlots.length>0){
+      // Créer une entrée par emplacement sélectionné, qty=1 chacune
+      selSlots.forEach((slot,idx)=>{
+        wines.push({...wine,id:uid(),slot,qty:1});
+      });
+      // Si moins d'emplacements que de bouteilles, le reste en une seule entrée sans slot
+      const remaining=qty-selSlots.length;
+      if(remaining>0) wines.push({...wine,id:uid(),slot:null,qty:remaining});
+    } else {
+      wines.push(wine);
+    }
+  }
   save();closeAll();
   const isNew=!editId;
   showToast(editId?'✅ Vin modifié':'🍾 Bouteille ajoutée !');
-  window._aip=null;window._aisrc=null;window._aitrend=null;selSlot=null;enrichedData={};
+  window._aip=null;window._aisrc=null;window._aitrend=null;selSlot=null;selSlots=[];enrichedData={};
   setTimeout(()=>switchTab(tab),300);
   // Si nouveau vin sans prix marché et clé API dispo → chercher le prix en arrière-plan
   if(isNew&&!wine.currentPrice&&getProxyUrl()){
@@ -1128,7 +1171,7 @@ async function refreshAllPrices(){
 function editWine(id){
   const w=wines.find(x=>x.id===id);if(!w)return;
   closeSheet('detailSheet');
-  editId=id;selSlot=w.slot||null;photoUrl=w.photo||null;enrichedData={};
+  editId=id;selSlot=w.slot||null;selSlots=w.slot?[w.slot]:[];photoUrl=w.photo||null;enrichedData={};
   document.getElementById('addTitle').textContent='Modifier le vin';
   document.getElementById('saveBtn').textContent='Enregistrer';
   clearForm();
@@ -1140,10 +1183,7 @@ function editWine(id){
   lastSearchedName=w.name+(w.year?' '+w.year:'');
   // En mode édition on va directement à l'étape 2 (tous les champs déjà remplis)
   renderSlotPicker(id);
-  const lbl=document.getElementById('selSlotLbl');
-  if(selSlot&&cave){const[ei,ci]=selSlot.split('-').map(Number);const et=cave.etages[ei];lbl.textContent=`${et?.label||'Étage '+(ei+1)} · Position ${ci+1}`}
-  else lbl.textContent='Aucun';
-  setTimeout(()=>{showSheet('addSheet');wizGoStep(2)},120);
+  setTimeout(()=>{showSheet('addSheet');wizGoStep(2);updateSlotLbl();},120);
 }
 function drinkWine(id){
   const w=wines.find(x=>x.id===id);if(!w)return;
