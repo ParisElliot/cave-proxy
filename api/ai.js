@@ -86,6 +86,34 @@ function parseJson(txt) {
 
 // ── Handler principal ────────────────────────────────────────────────────────
 
+// ── RECHERCHE PRIX VIA GOOGLE CUSTOM SEARCH + GROQ ────────────────────────
+async function searchWinePrice({ name, year, domain, app, region }) {
+  const wineLabel = [name, year, domain].filter(Boolean).join(" ");
+  const query = `prix ${wineLabel} acheter bouteille`;
+
+  let snippets = "";
+  const apiKey = process.env.GOOGLE_API_KEY;
+  const cx     = process.env.GOOGLE_CX;
+
+  if (apiKey && cx) {
+    try {
+      const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${encodeURIComponent(query)}&num=5&lr=lang_fr`;
+      const gr = await fetch(url);
+      const gData = await gr.json();
+      snippets = (gData.items || [])
+        .map(r => `${r.title} — ${r.snippet || ""} [${r.link}]`)
+        .join("\n");
+    } catch(e) { snippets = ""; }
+  }
+
+  const prompt = snippets
+    ? `Voici des résultats Google pour le vin "${wineLabel}" :\n${snippets}\n\nExtrait le prix actuel de vente en bouteille 75cl (en euros). Réponds JSON UNIQUEMENT, sans markdown :\n{"currentPrice":85,"priceRange":"70-100€","priceSource":"iDealwine","trend":"hausse|stable|baisse","priceNote":"bref contexte"}`
+    : `Estime le prix marché 2025 du vin "${wineLabel}" selon son appellation et millésime. Réponds JSON UNIQUEMENT, sans markdown :\n{"currentPrice":85,"priceRange":"70-100€","priceSource":"estimation","trend":"stable","priceNote":"estimation sans données web"}`;
+
+  const txt = await groqText(prompt);
+  return parseJson(txt);
+}
+
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") {
     res.writeHead(204, corsHeaders());
@@ -156,14 +184,7 @@ Réponds JSON UNIQUEMENT, sans markdown :
     // ── 3. Recherche de prix ──────────────────────────────────────────────
     } else if (body.type === "price") {
       const { name, year, domain, app, region } = body;
-      const prompt = `Tu es un expert en vins. Estime le prix actuel marché 2025-2026 de ce vin :
-"${name}"${year ? " " + year : ""}${domain ? " · " + domain : ""}${app ? " · " + app : (region ? " · " + region : "")}
-
-Base-toi sur ta connaissance des prix Wine-Searcher, iDealwine, Millésima.
-Réponds JSON UNIQUEMENT, sans markdown :
-{"currentPrice":85,"priceRange":"70-100€","priceSource":"estimation experte","trend":"hausse|stable|baisse","priceNote":"contexte court"}`;
-      const txt = await groqText(prompt);
-      result = parseJson(txt);
+      result = await searchWinePrice({ name, year, domain, app, region });
 
     } else {
       res.writeHead(400, corsHeaders());
