@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "Proxy Vercel pour l'app Cave à Vin — Gemini API",
   "private": true,
+  "type": "module",
   "engines": {
-    "node": ">=18"
+    "node": "20.x"
   }
 }
