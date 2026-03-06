@@ -497,12 +497,17 @@ function groupWines(list){
   list.forEach(w=>{
     const k=groupKey(w);
     if(!map.has(k)){
-      map.set(k,{...w,_ids:[w.id],_slots:[w.slot],_qty:+w.qty||1});
+      map.set(k,{...w,_ids:[w.id],_slots:[w.slot?[w.slot]:[]],_qty:+w.qty||1});
     } else {
       const g=map.get(k);
       g._ids.push(w.id);
       if(w.slot) g._slots.push(w.slot);
       g._qty+=(+w.qty||1);
+      // Propager les champs manquants depuis les autres bouteilles du groupe
+      if(g.score==null&&w.score!=null) g.score=w.score;
+      if(!g.notes&&w.notes) g.notes=w.notes;
+      if(!g.grape&&w.grape) g.grape=w.grape;
+      if(!g.food&&w.food) g.food=w.food;
     }
   });
   return [...map.values()];
@@ -656,7 +661,7 @@ function wCard(w){
     <div class="wi">
       <div class="wname">${w.name||'Vin sans nom'}</div>
       <div class="wdom">${w.domain||''}${w.region?' · '+w.region:''}${w.country&&w.country!=='France'?' 🌍':''}</div>
-      <div class="wmeta">${w.year?`<span class="b by">${w.year}</span>`:''}${fBadge}${(w._qty||w.qty)>1?`<span class="b bq">×${w._qty||w.qty}</span>`:''}${w.score?`<span class="b bsc">★${w.score}</span>`:''}${statusBadge(w)}</div>
+      <div class="wmeta">${w.year?`<span class="b by">${w.year}</span>`:''}${fBadge}${(w._qty||w.qty)>1?`<span class="b bq">×${w._qty||w.qty}</span>`:''}${(w.score!=null&&w.score!=='')?`<span class="b bsc">★${w.score}</span>`:''}${statusBadge(w)}</div>
     </div>
     <div class="wrt">
       <div style="text-align:right">${w.gift?'🎁':w.price?`<div class="wprice">${(+w.price).toFixed(0)}€</div>`:''}${evo}</div>
