@@ -10,7 +10,7 @@
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const MODEL_TEXT  = "gemini-2.0-flash";        // texte + grounding (web search)
-const MODEL_VIS   = "gemini-2.0-flash";        // vision (analyse étiquette)
+const MODEL_VIS   = "gemini-1.5-flash";        // vision stable (analyse étiquette)
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -60,8 +60,13 @@ async function geminiVision(base64, mimeType, prompt) {
     body: JSON.stringify(body),
   });
   const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  return data.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "";
+  if (data.error) {
+    console.error("Gemini Vision error:", JSON.stringify(data.error));
+    throw new Error(data.error.message);
+  }
+  const text = data.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "";
+  console.log("Gemini Vision response:", text.slice(0, 200));
+  return text;
 }
 
 function parseJson(txt) {
