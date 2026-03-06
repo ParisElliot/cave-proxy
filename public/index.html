@@ -503,7 +503,7 @@ function groupWines(list){
   list.forEach(w=>{
     const k=groupKey(w);
     if(!map.has(k)){
-      map.set(k,{...w,_ids:[w.id],_slots:[w.slot?[w.slot]:[]],_qty:+w.qty||1});
+      map.set(k,{...w,_ids:[w.id],_slots:w.slot?[w.slot]:[],_qty:+w.qty||1});
     } else {
       const g=map.get(k);
       g._ids.push(w.id);
@@ -1144,13 +1144,13 @@ async function analyzeLabel(url){
 async function saveWine(){
   const name=document.getElementById('f_name').value.trim();
   if(!name){showToast('⚠️ Entrez un nom');return}
-  const g=id=>document.getElementById(id)?.value;
+  const g=id=>{const e=document.getElementById(id);return e?e.value:'';};
   const n=v=>parseFloat(v)||null,ni=v=>parseInt(v)||null;
   const wine={id:editId||uid(),name,domain:g('f_domain')||'',year:ni(g('f_year')),type:g('f_type')||'red',
     region:g('f_region')||'',app:g('f_app')||'',country:g('f_country')||'France',format:ni(g('f_format'))||750,
     grape:g('f_grape')||'',qty:ni(g('f_qty'))||1,price:n(g('f_price')),gift:g('f_gift')||'',
     kF:ni(g('f_kF')),kT:ni(g('f_kT')),pF:ni(g('f_pF')),pT:ni(g('f_pT')),decant:ni(g('f_dec')),temp:ni(g('f_temp')),
-    food:g('f_food')||'',score:(g('f_score')!==''&&g('f_score')!=null?parseFloat(g('f_score'))||null:null),notes:g('f_notes')||'',perso:g('f_perso')||'',
+    food:g('f_food')||'',score:(g('f_score')!==''?parseFloat(g('f_score'))||null:null),notes:g('f_notes')||'',perso:g('f_perso')||'',
     slot:selSlots[0]||selSlot||null,photo:photoUrl,
     currentPrice:window._aip||enrichedData.currentPrice||null,
     priceSrc:window._aisrc||enrichedData.priceSource||null,
