@@ -1058,7 +1058,7 @@ async function saveWine(){
     region:g('f_region')||'',app:g('f_app')||'',country:g('f_country')||'France',format:ni(g('f_format'))||750,
     grape:g('f_grape')||'',qty:ni(g('f_qty'))||1,price:n(g('f_price')),gift:g('f_gift')||'',
     kF:ni(g('f_kF')),kT:ni(g('f_kT')),pF:ni(g('f_pF')),pT:ni(g('f_pT')),decant:ni(g('f_dec')),temp:ni(g('f_temp')),
-    food:g('f_food')||'',score:n(g('f_score')),notes:g('f_notes')||'',perso:g('f_perso')||'',
+    food:g('f_food')||'',score:(g('f_score')!==''&&g('f_score')!=null?parseFloat(g('f_score'))||null:null),notes:g('f_notes')||'',perso:g('f_perso')||'',
     slot:selSlots[0]||selSlot||null,photo:photoUrl,
     currentPrice:window._aip||enrichedData.currentPrice||null,
     priceSrc:window._aisrc||enrichedData.priceSource||null,
@@ -1140,7 +1140,7 @@ function renderDetailGroup(ws){
         <span class="b by">${emo(w.type)} ${typeLbl(w.type)}</span>
         ${w.format&&+w.format!==750?`<span class="b by">📦 ${fmtLbl(w.format)}</span>`:''}
         ${w.grape?`<span class="b by" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w.grape}</span>`:''}
-        <span class="b bq">×${totalQty} bouteille${totalQty>1?'s':''}</span>
+        ${totalQty>1?`<span class="b bq">×${totalQty} bouteilles</span>`:''}
         ${w.score?`<span class="b bsc">★ ${w.score}/20</span>`:''}
         ${statusBadge(w)}
       </div>
